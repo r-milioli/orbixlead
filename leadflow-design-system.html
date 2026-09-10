@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeadFlow CRM — Design System</title>
+<style>
+:root{
+  color-scheme:light;
+  --primary:#15AABF;--primary-hover:#1098AD;--primary-dark:#0C8599;--primary-light:#E3FAFC;
+  --bg:#F8F9FA;--surface:#FFFFFF;--surface-2:#F1F3F5;--surface-3:#FCFCFC;--text:#212529;--text-2:#495057;--muted:#868E96;
+  --border:#DEE2E6;--border-light:#E9ECEF;--border-strong:#CED4DA;--success:#2F9E44;--warning:#F08C00;--danger:#E03131;
+  --success-bg:#EBFBEE;--warning-bg:#FFF4E6;--danger-bg:#FFF5F5;--info-bg:#E3FAFC;
+  --shadow-sm:0 2px 6px rgba(0,0,0,.06);--shadow-md:0 8px 24px rgba(0,0,0,.08);--shadow-lg:0 16px 40px rgba(0,0,0,.12);
+  --sidebar:248px;--sidebar-collapsed:72px;--topbar:64px;
+  --overlay:rgba(15,23,42,.45);
+}
+
+[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0D1117;--surface:#151B23;--surface-2:#1B222C;--surface-3:#202833;--text:#F1F5F9;--text-2:#CBD5E1;--muted:#8B98A8;
+  --border:#303A46;--border-light:#27313D;--border-strong:#3B4755;
+  --primary-light:#123D45;--success-bg:#12351F;--warning-bg:#3A2912;--danger-bg:#3A1818;--info-bg:#123D45;
+  --shadow-sm:0 2px 6px rgba(0,0,0,.20);--shadow-md:0 8px 24px rgba(0,0,0,.28);--shadow-lg:0 16px 40px rgba(0,0,0,.40);
+  --overlay:rgba(0,0,0,.62);
+}
+
+*{transition-property:background-color,border-color,color,box-shadow;transition-duration:.12s;transition-timing-function:ease}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+button,input,textarea,select{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(21,170,191,.35)}
+a{color:var(--primary-dark);text-decoration:none}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:99px}::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+*{scrollbar-width:thin;scrollbar-color:#CED4DA transparent}
+
+.app{min-height:100vh}
+.sidebar{position:fixed;z-index:50;left:0;top:0;bottom:0;width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border-light);transition:width .18s ease;overflow:hidden}
+.sidebar.collapsed{width:var(--sidebar-collapsed)}
+.brand{height:var(--topbar);display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--border-light);white-space:nowrap}
+.brand-mark{width:30px;height:30px;border-radius:8px;background:var(--primary);display:grid;place-items:center;color:#fff;font-weight:800}
+.brand-name{font-size:16px;font-weight:700}
+.sidebar.collapsed .brand{justify-content:center;padding:0}.sidebar.collapsed .brand-name,.sidebar.collapsed .nav-label,.sidebar.collapsed .credit-box,.sidebar.collapsed .collapse-text{display:none}
+.nav{padding:16px 10px}.nav-section{margin:16px 8px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.nav-item{height:40px;display:flex;align-items:center;gap:12px;padding:0 12px;border-radius:6px;color:var(--text-2);margin:3px 0;width:100%;text-align:left;white-space:nowrap}
+.nav-item:hover{background:var(--surface-2)}.nav-item.active{background:var(--primary-light);color:var(--primary-dark);position:relative}
+.nav-item.active:before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--primary);border-radius:0 3px 3px 0}
+.icon{width:18px;height:18px;flex:0 0 18px;stroke-width:1.8}
+.sidebar-bottom{position:absolute;bottom:14px;left:10px;right:10px}
+.credit-box{padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:10px}
+.credit-row{display:flex;justify-content:space-between;gap:8px;font-size:12px}.credit-row strong{font-size:13px}
+.progress{height:6px;background:var(--border-light);border-radius:99px;overflow:hidden}.progress>span{display:block;height:100%;background:var(--primary);border-radius:99px}
+.collapse-btn{width:100%;height:38px;border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--text-2);background:var(--surface)}.collapse-btn:hover{background:var(--surface-2)}
+
+.main{margin-left:var(--sidebar);transition:margin-left .18s ease;min-height:100vh}.main.expanded{margin-left:var(--sidebar-collapsed)}
+.topbar{height:var(--topbar);position:sticky;top:0;z-index:30;background:color-mix(in srgb, var(--surface) 96%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.top-left,.top-actions{display:flex;align-items:center;gap:12px}.menu-btn{width:38px;height:38px;border:1px solid var(--border);border-radius:6px;display:grid;place-items:center}.menu-btn:hover{background:var(--surface-2)}
+.page-title{font-size:16px;font-weight:700}.crumb{font-size:12px;color:var(--muted)}
+.icon-btn{width:36px;height:36px;display:grid;place-items:center;border-radius:6px;color:var(--text-2)}.icon-btn:hover{background:var(--surface-2)}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--primary-light);color:var(--primary-dark);display:grid;place-items:center;font-weight:700}
+
+.content{padding:28px;max-width:1600px;margin:auto}.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:24px}.page-head h1{font-size:28px;line-height:1.2;margin:0 0 6px}.page-head p{margin:0;color:var(--muted)}.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.btn{height:40px;padding:0 14px;border-radius:6px;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:600;transition:.12s}.btn.primary{background:var(--primary);color:#fff}.btn.primary:hover{background:var(--primary-hover)}.btn.secondary{background:var(--surface);border-color:var(--border)}.btn.secondary:hover,.btn.subtle:hover{background:var(--surface-2)}.btn.subtle{color:var(--text-2)}.btn.danger{background:var(--danger);color:#fff}.btn.small{height:34px;padding:0 10px;font-size:13px}.btn:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--surface);border:1px solid var(--border-light);border-radius:8px;padding:16px}.card.clickable:hover{border-color:#CED4DA;box-shadow:var(--shadow-sm)}
+.grid{display:grid;gap:16px}.kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:repeat(3,1fr)}
+.kpi-label{color:var(--muted);font-size:13px}.kpi-value{font-size:28px;font-weight:750;margin:8px 0}.kpi-foot{font-size:12px;color:var(--success);display:flex;align-items:center;gap:5px}
+.section-title{font-size:16px;font-weight:700;margin:0}.section-sub{font-size:12px;color:var(--muted);margin:4px 0 0}.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+
+.funnel{display:flex;flex-direction:column;gap:10px}.funnel-row{display:grid;grid-template-columns:90px 1fr 50px;gap:10px;align-items:center;font-size:12px}.funnel-bar{height:24px;background:var(--primary-light);border-radius:4px;overflow:hidden}.funnel-bar span{display:block;height:100%;background:var(--primary);opacity:.85}
+.bars{height:220px;display:flex;align-items:flex-end;gap:12px;border-bottom:1px solid var(--border);padding:15px 4px 0}.bar-wrap{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}.bar{width:100%;max-width:34px;background:var(--primary);border-radius:4px 4px 0 0;min-height:4px}.bar.alt{background:#A5D8DD}.bar-label{font-size:10px;color:var(--muted)}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.input,.select,.textarea{width:100%;border:1px solid var(--border);border-radius:6px;background:var(--surface);transition:.12s}.input,.select{height:40px;padding:0 11px}.textarea{padding:10px 11px;min-height:110px;resize:vertical}.input:hover,.select:hover,.textarea:hover{border-color:#ADB5BD}.input:focus,.select:focus,.textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(21,170,191,.12)}
+.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:13px;font-weight:600}.field small{font-size:12px;color:var(--muted)}.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.form-grid .full{grid-column:1/-1}
+.table-wrap{overflow:auto;border:1px solid var(--border-light);border-radius:8px;background:#fff}.table{width:100%;border-collapse:collapse;min-width:760px}.table th,.table td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--border-light);white-space:nowrap}.table th{font-size:12px;color:var(--muted);background:var(--bg);font-weight:700}.table tr:last-child td{border-bottom:0}.table tr:hover td{background:var(--surface-3)}
+.checkbox{width:17px;height:17px;accent-color:var(--primary)}
+.badge{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700}.cold{background:#E7F5FF;color:#1971C2}.warm{background:#FFF3BF;color:#E67700}.hot{background:#FFE3E3;color:#C92A2A}.success{background:#EBFBEE;color:var(--success)}
+.stars{letter-spacing:1px;color:#F08C00}.muted{color:var(--muted)}.company{font-weight:650}.meta{font-size:12px;color:var(--muted);margin-top:3px}
+.pagination{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px}.pages{display:flex;gap:4px}.page{min-width:34px;height:34px;border:1px solid var(--border);border-radius:6px;background:var(--surface)}.page:hover{background:var(--surface-2)}.page.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+.kanban-wrap{overflow-x:auto;padding-bottom:10px}.kanban{display:flex;gap:12px;min-width:max-content}.column{width:280px;background:var(--surface-2);border:1px solid var(--border-light);border-radius:8px;padding:8px}.column.drop{border:1px dashed var(--primary);background:var(--primary-light)}.col-head{display:flex;align-items:center;justify-content:space-between;padding:7px 5px 10px}.col-title{font-size:13px;font-weight:700}.count{font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px 7px;color:var(--muted)}
+.lead-card{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.03);cursor:grab}.lead-card:active{cursor:grabbing}.lead-top{display:flex;justify-content:space-between;gap:8px}.lead-actions{display:flex;gap:4px;margin-top:10px}.mini-btn{height:30px;padding:0 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);font-size:11px;display:inline-flex;align-items:center;gap:5px}.mini-btn:hover{background:var(--surface-2)}.mini-btn.whatsapp{color:#087F5B}.mini-btn.phone{color:var(--primary-dark)}
+
+.overlay{position:fixed;inset:0;background:var(--overlay);z-index:100;display:none}.overlay.show{display:block}
+.modal,.drawer{position:fixed;z-index:110;background:var(--surface);box-shadow:var(--shadow-lg);display:none}.modal{width:min(520px,calc(100vw - 32px));left:50%;top:50%;transform:translate(-50%,-50%);border-radius:10px;max-height:calc(100vh - 32px);overflow:auto}.modal.show{display:block}.drawer{right:0;top:0;bottom:0;width:min(480px,100vw);overflow:auto}.drawer.show{display:block}
+.modal-head,.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border-light)}.modal-body,.drawer-body{padding:20px}.modal-foot,.drawer-foot{padding:16px 20px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:8px}.modal h2,.drawer h2{font-size:18px;margin:0}.close{width:34px;height:34px;border-radius:6px;display:grid;place-items:center}.close:hover{background:var(--surface-2)}
+
+.menu{position:fixed;z-index:150;min-width:190px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:6px;display:none}.menu.show{display:block}.menu-item{height:36px;width:100%;display:flex;align-items:center;gap:9px;padding:0 9px;border-radius:5px;text-align:left;color:var(--text-2);font-size:13px}.menu-item:hover{background:var(--surface-2)}.menu-item.danger{color:var(--danger)}
+.dropdown{position:relative}.dropdown-panel{position:absolute;top:calc(100% + 7px);right:0;z-index:150;width:300px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:8px;display:none}.dropdown-panel.show{display:block}.scroll-list{max-height:230px;overflow:auto}.notif{padding:10px;border-radius:6px}.notif:hover{background:var(--surface-2)}.notif b{font-size:12px}.notif p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+
+.toast-stack{position:fixed;right:20px;top:80px;z-index:300;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 40px))}.toast{background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:13px;display:flex;gap:10px;animation:toastIn .18s ease}.toast.success-t{border-left:3px solid var(--success)}.toast.error-t{border-left:3px solid var(--danger)}.toast.warn-t{border-left:3px solid var(--warning)}.toast.info-t{border-left:3px solid var(--primary)}.toast strong{font-size:13px}.toast p{margin:3px 0 0;color:var(--muted);font-size:12px}.toast .x{margin-left:auto;color:var(--muted)}@keyframes toastIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+
+.empty{padding:48px 20px;text-align:center}.empty .empty-icon{width:48px;height:48px;margin:auto auto 12px;border:1px solid var(--border);border-radius:10px;display:grid;place-items:center;color:var(--muted)}.empty h3{margin:0 0 5px;font-size:16px}.empty p{margin:0 0 16px;color:var(--muted)}
+.alert{display:flex;gap:10px;padding:12px 14px;border-radius:8px;border:1px solid;margin-bottom:16px}.alert.info{background:var(--primary-light);border-color:#C5F6FA;color:var(--primary-dark)}.alert.warning{background:var(--warning-bg);border-color:#FFD8A8;color:#D9480F}.alert.error{background:var(--danger-bg);border-color:#FFC9C9;color:#C92A2A}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px}.tab{padding:10px 12px;border-bottom:2px solid transparent;color:var(--muted)}.tab.active{color:var(--primary-dark);border-color:var(--primary);font-weight:650}
+
+.preview{background:var(--surface-2);border-radius:8px;padding:16px}.message-bubble{background:var(--surface);border:1px solid var(--border-light);border-radius:8px;padding:12px;max-width:90%;line-height:1.5}
+
+.view{display:none}.view.active{display:block}
+.mobile-only{display:none}
+
+.theme-menu{padding:8px 9px 7px;border-top:1px solid var(--border-light);border-bottom:1px solid var(--border-light);margin:5px 0}
+.theme-menu-label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:2px 3px 6px}
+.theme-options{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.theme-option{height:34px;border:1px solid transparent;border-radius:6px;color:var(--text-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px}
+.theme-option svg{width:15px;height:15px}
+.theme-option:hover{background:var(--surface-2)}
+.theme-option.active{background:var(--primary-light);color:var(--primary-dark);border-color:rgba(21,170,191,.25)}
+[data-theme="dark"] .theme-option.active{color:#67E8F9;border-color:rgba(103,232,249,.22)}
+.theme-indicator{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.theme-indicator svg{width:14px;height:14px}
+
+@media(max-width:1000px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.three{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .sidebar{width:0;border:0}.sidebar.mobile-open{width:248px;border-right:1px solid var(--border-light);box-shadow:var(--shadow-lg)}
+  .main,.main.expanded{margin-left:0}.content{padding:20px 14px}.page-head{align-items:flex-start;flex-direction:column}.page-head h1{font-size:24px}.kpi-grid{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}.form-grid .full{grid-column:auto}.mobile-only{display:block}
+  .topbar{padding:0 14px}.crumb{display:none}.page-title{font-size:14px}.top-actions .icon-btn:nth-child(1){display:none}
+}
+@media(max-width:480px){.kpi-grid{grid-template-columns:1fr}.actions{width:100%}.actions .btn{flex:1}.pagination{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">L</div><span class="brand-name">LeadFlow CRM</span></div>
+    <nav class="nav">
+      <div class="nav-section">Principal</div>
+      <button class="nav-item active" data-view="dashboard"><i data-lucide="layout-dashboard" class="icon"></i><span class="nav-label">Dashboard</span></button>
+      <button class="nav-item" data-view="capture"><i data-lucide="search" class="icon"></i><span class="nav-label">Capturar Leads</span></button>
+      <button class="nav-item" data-view="leads"><i data-lucide="users" class="icon"></i><span class="nav-label">Leads Capturados</span></button>
+      <div class="nav-section">CRM</div>
+      <button class="nav-item" data-view="crm"><i data-lucide="kanban-square" class="icon"></i><span class="nav-label">Pipeline</span></button>
+      <button class="nav-item" data-view="messages"><i data-lucide="message-square" class="icon"></i><span class="nav-label">Mensagens</span></button>
+      <button class="nav-item" data-view="goals"><i data-lucide="target" class="icon"></i><span class="nav-label">Metas</span></button>
+      <div class="nav-section">Conta</div>
+      <button class="nav-item" data-view="settings"><i data-lucide="settings" class="icon"></i><span class="nav-label">Configurações</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="credit-box">
+        <div class="credit-row"><span>Créditos</span><strong>1.284 / 1.500</strong></div>
+        <div class="progress" style="margin-top:8px"><span style="width:85.6%"></span></div>
+      </div>
+      <button class="collapse-btn" id="collapseBtn"><i data-lucide="panel-left-close" class="icon"></i><span class="collapse-text">Recolher menu</span></button>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <header class="topbar">
+      <div class="top-left">
+        <button class="menu-btn" id="menuBtn" aria-label="Abrir menu"><i data-lucide="menu"></i></button>
+        <div><div class="crumb">LeadFlow CRM / <span id="crumbText">Dashboard</span></div><div class="page-title" id="topTitle">Dashboard</div></div>
+      </div>
+      <div class="top-actions">
+        <div class="dropdown">
+          <button class="icon-btn" id="notifBtn"><i data-lucide="bell"></i></button>
+          <div class="dropdown-panel" id="notifPanel">
+            <div class="card-head"><strong>Notificações</strong><span class="badge success">3 novas</span></div>
+            <div class="scroll-list">
+              <div class="notif"><b>Nova captura concluída</b><p>42 novos leads foram processados.</p></div>
+              <div class="notif"><b>Meta mensal atualizada</b><p>Você alcançou 74% da meta.</p></div>
+              <div class="notif"><b>Créditos em atenção</b><p>Você possui 1.284 créditos.</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="dropdown">
+          <button class="avatar" id="userBtn">RM</button>
+          <div class="dropdown-panel" id="userPanel" style="width:210px">
+            <div style="padding:9px;border-bottom:1px solid var(--border-light);margin-bottom:5px"><strong>Robson Milioli</strong><div class="meta">Administrador</div></div>
+            <button class="menu-item"><i data-lucide="user-round"></i>Meu perfil</button>
+            <button class="menu-item" data-view="settings"><i data-lucide="settings"></i>Configurações</button>
+            <div class="theme-menu">
+              <div class="theme-menu-label">Tema</div>
+              <div class="theme-options" role="group" aria-label="Escolher tema">
+                <button class="theme-option" data-theme-choice="light"><i data-lucide="sun"></i><span>Claro</span></button>
+                <button class="theme-option" data-theme-choice="dark"><i data-lucide="moon"></i><span>Escuro</span></button>
+                <button class="theme-option" data-theme-choice="system"><i data-lucide="monitor"></i><span>Sistema</span></button>
+              </div>
+            </div>
+            <button class="menu-item"><i data-lucide="log-out"></i>Sair</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="content">
+      <!-- DASHBOARD -->
+      <div class="view active" id="dashboard">
+        <div class="page-head"><div><h1>Dashboard</h1><p>Acompanhe o desempenho da sua operação.</p></div><div class="actions"><button class="btn secondary" onclick="showToast('info','Relatório','Relatório preparado para exportação.')"><i data-lucide="download"></i>Exportar</button><button class="btn primary" data-view="capture"><i data-lucide="plus"></i>Nova captura</button></div></div>
+        <div class="grid kpi-grid">
+          <div class="card"><div class="kpi-label">Taxa de conversão</div><div class="kpi-value">18,4%</div><div class="kpi-foot"><i data-lucide="trending-up"></i> +2,4% no período</div></div>
+          <div class="card"><div class="kpi-label">Custo por conversão</div><div class="kpi-value">R$ 42,80</div><div class="kpi-foot"><i data-lucide="trending-down"></i> -8,2% no período</div></div>
+          <div class="card"><div class="kpi-label">Leads — últimos 7 dias</div><div class="kpi-value">1.248</div><div class="kpi-foot"><i data-lucide="trending-up"></i> +12,4% no período</div></div>
+          <div class="card"><div class="kpi-label">Convertidos — últimos 7 dias</div><div class="kpi-value">236</div><div class="kpi-foot"><i data-lucide="trending-up"></i> +5,8% no período</div></div>
+        </div>
+        <div class="grid two">
+          <div class="card"><div class="card-head"><div><h2 class="section-title">Funil de conversão</h2><p class="section-sub">Progressão do pipeline</p></div><button class="icon-btn" onclick="openMenu(event)"><i data-lucide="more-horizontal"></i></button></div>
+            <div class="funnel">
+              <div class="funnel-row"><span>Total</span><div class="funnel-bar"><span style="width:100%"></span></div><strong>1.248</strong></div>
+              <div class="funnel-row"><span>Agendados</span><div class="funnel-bar"><span style="width:72%"></span></div><strong>898</strong></div>
+              <div class="funnel-row"><span>Abordados</span><div class="funnel-bar"><span style="width:54%"></span></div><strong>674</strong></div>
+              <div class="funnel-row"><span>Follow up</span><div class="funnel-bar"><span style="width:38%"></span></div><strong>474</strong></div>
+              <div class="funnel-row"><span>Perdidos</span><div class="funnel-bar"><span style="width:16%"></span></div><strong>200</strong></div>
+              <div class="funnel-row"><span>Convertidos</span><div class="funnel-bar"><span style="width:19%"></span></div><strong>236</strong></div>
+            </div>
+          </div>
+          <div class="card"><div class="card-head"><div><h2 class="section-title">Prospecção — 30 dias</h2><p class="section-sub">Leads importados vs. convertidos</p></div></div>
+            <div class="bars">
+              <div class="bar-wrap"><div class="bar" style="height:70%"></div><div class="bar-label">01</div></div><div class="bar-wrap"><div class="bar" style="height:45%"></div><div class="bar-label">05</div></div><div class="bar-wrap"><div class="bar" style="height:80%"></div><div class="bar-label">10</div></div><div class="bar-wrap"><div class="bar" style="height:58%"></div><div class="bar-label">15</div></div><div class="bar-wrap"><div class="bar" style="height:92%"></div><div class="bar-label">20</div></div><div class="bar-wrap"><div class="bar" style="height:64%"></div><div class="bar-label">25</div></div><div class="bar-wrap"><div class="bar" style="height:78%"></div><div class="bar-label">30</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="grid three" style="margin-top:16px">
+          <div class="card"><div class="kpi-label">Importados hoje</div><div class="kpi-value">184</div></div>
+          <div class="card"><div class="kpi-label">Avançaram hoje</div><div class="kpi-value">37</div></div>
+          <div class="card"><div class="kpi-label">Meta mensal</div><div class="kpi-value" style="font-size:24px">148 / 200</div><div class="progress"><span style="width:74%"></span></div><div class="meta" style="margin-top:7px">74% concluído</div></div>
+        </div>
+      </div>
+
+      <!-- CAPTURE -->
+      <div class="view" id="capture">
+        <div class="page-head"><div><h1>Capturar Leads</h1><p>Encontre novos leads qualificados para sua prospecção.</p></div></div>
+        <div class="alert info"><i data-lucide="info"></i><div><strong>Captura assíncrona</strong><div style="font-size:12px;margin-top:3px">A busca será processada em segundo plano. Você poderá continuar usando o CRM.</div></div></div>
+        <div class="card">
+          <div class="card-head"><div><h2 class="section-title">Nova captura</h2><p class="section-sub">Defina os critérios da pesquisa.</p></div><span class="badge success">1.284 créditos disponíveis</span></div>
+          <div class="form-grid">
+            <div class="field"><label>País</label><select class="select"><option>Brasil</option><option>Argentina</option><option>Portugal</option></select></div>
+            <div class="field"><label>Cidade</label><input class="input" placeholder="Ex.: Rio de Janeiro"></div>
+            <div class="field"><label>Segmentação</label><input class="input" placeholder="Ex.: restaurantes"></div>
+            <div class="field"><label>Quantidade desejada</label><input class="input" type="number" value="100" min="1"></div>
+            <div class="full" style="display:flex;justify-content:flex-end"><button class="btn primary" id="captureBtn"><i data-lucide="search"></i>Iniciar captura</button></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-head"><div><h2 class="section-title">Última captura</h2><p class="section-sub">Resultado de demonstração</p></div><span class="badge hot">42 quentes</span></div>
+          <div class="grid three">
+            <div><div class="kpi-label">Leads encontrados</div><strong style="font-size:24px">184</strong></div><div><div class="kpi-label">Novos e únicos</div><strong style="font-size:24px">172</strong></div><div><div class="kpi-label">Créditos consumidos</div><strong style="font-size:24px">172</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEADS -->
+      <div class="view" id="leads">
+        <div class="page-head"><div><h1>Leads Capturados</h1><p>Gerencie os leads encontrados nas suas prospecções.</p></div><div class="actions"><button class="btn secondary" onclick="openDrawer('filterDrawer')"><i data-lucide="sliders-horizontal"></i>Filtros</button><button class="btn primary" onclick="showToast('success','Leads adicionados','3 leads foram adicionados ao CRM.')"><i data-lucide="kanban-square"></i>Adicionar ao CRM</button></div></div>
+        <div class="toolbar"><input class="input" style="max-width:320px" placeholder="Buscar empresa, telefone..." oninput="filterRows(this.value)"><select class="select" style="width:150px"><option>Temperatura</option><option>Frio</option><option>Morno</option><option>Quente</option></select><select class="select" style="width:150px"><option>Cidade</option><option>Rio de Janeiro</option><option>Niterói</option></select></div>
+        <div class="table-wrap"><table class="table" id="leadTable"><thead><tr><th><input class="checkbox" type="checkbox"></th><th>Empresa</th><th>Cidade</th><th>Temperatura</th><th>Avaliações</th><th>Telefone</th><th>Site</th><th>Ações</th></tr></thead><tbody>
+          <tr><td><input class="checkbox" type="checkbox"></td><td><div class="company">Restaurante Aurora</div><div class="meta">Restaurante</div></td><td>Rio de Janeiro</td><td><span class="badge hot">Quente</span></td><td><span class="stars">★★★★★</span></td><td>(21) 99999-1111</td><td><span class="badge hot">Sem site</span></td><td><button class="icon-btn" onclick="openMenu(event)"><i data-lucide="more-horizontal"></i></button></td></tr>
+          <tr><td><input class="checkbox" type="checkbox"></td><td><div class="company">Studio Prime</div><div class="meta">Academia</div></td><td>Niterói</td><td><span class="badge warm">Morno</span></td><td><span class="stars">★★★★☆</span></td><td>(21) 98888-2222</td><td>Disponível</td><td><button class="icon-btn" onclick="openMenu(event)"><i data-lucide="more-horizontal"></i></button></td></tr>
+          <tr><td><input class="checkbox" type="checkbox"></td><td><div class="company">Clínica Central</div><div class="meta">Clínica</div></td><td>São Gonçalo</td><td><span class="badge cold">Frio</span></td><td><span class="stars">★★★★★</span></td><td>(21) 97777-3333</td><td>Disponível</td><td><button class="icon-btn" onclick="openMenu(event)"><i data-lucide="more-horizontal"></i></button></td></tr>
+          <tr><td><input class="checkbox" type="checkbox"></td><td><div class="company">Auto Center Norte</div><div class="meta">Automotivo</div></td><td>Nova Iguaçu</td><td><span class="badge hot">Quente</span></td><td><span class="stars">★★★☆☆</span></td><td>(21) 96666-4444</td><td><span class="badge hot">Sem site</span></td><td><button class="icon-btn" onclick="openMenu(event)"><i data-lucide="more-horizontal"></i></button></td></tr>
+        </tbody></table></div>
+        <div class="pagination"><span class="muted">Mostrando 1–25 de 248 leads</span><div class="pages"><button class="page"><i data-lucide="chevron-left"></i></button><button class="page active">1</button><button class="page">2</button><button class="page">3</button><button class="page">4</button><button class="page">5</button><button class="page"><i data-lucide="chevron-right"></i></button></div></div>
+      </div>
+
+      <!-- CRM -->
+      <div class="view" id="crm">
+        <div class="page-head"><div><h1>Pipeline</h1><p>Conduza seus leads até a conversão.</p></div><div class="actions"><button class="btn secondary" onclick="openDrawer('filterDrawer')"><i data-lucide="sliders-horizontal"></i>Filtros</button><button class="btn primary" onclick="showToast('success','Estágio criado','Novo estágio adicionado ao pipeline.')"><i data-lucide="plus"></i>Novo estágio</button></div></div>
+        <div class="kanban-wrap"><div class="kanban">
+          <div class="column" data-column="Novos"><div class="col-head"><span class="col-title">Novos</span><span class="count">3</span></div>
+            <div class="lead-card" draggable="true" onclick="openDrawer('leadDrawer')"><div class="lead-top"><div><div class="company">Restaurante Aurora</div><div class="meta">Rio de Janeiro · Restaurante</div></div><button class="icon-btn" onclick="event.stopPropagation();openMenu(event)"><i data-lucide="more-horizontal"></i></button></div><div style="margin-top:8px"><span class="badge hot">Quente</span></div><div class="lead-actions"><button class="mini-btn phone" onclick="event.stopPropagation();showToast('info','Telefone','Abrindo discagem...')"><i data-lucide="phone"></i>Ligar</button><button class="mini-btn whatsapp" onclick="event.stopPropagation();openModal('waModal')"><i data-lucide="message-circle"></i>WhatsApp</button></div></div>
+            <div class="lead-card" draggable="true"><div class="lead-top"><div><div class="company">Studio Prime</div><div class="meta">Niterói · Academia</div></div></div><div style="margin-top:8px"><span class="badge warm">Morno</span></div></div>
+            <div class="lead-card" draggable="true"><div class="lead-top"><div><div class="company">Auto Center Norte</div><div class="meta">Nova Iguaçu · Automotivo</div></div></div><div style="margin-top:8px"><span class="badge hot">Quente</span></div></div>
+          </div>
+          <div class="column" data-column="Abordados"><div class="col-head"><span class="col-title">Abordados</span><span class="count">2</span></div><div class="lead-card" draggable="true"><div class="company">Clínica Central</div><div class="meta">São Gonçalo · Clínica</div><div style="margin-top:8px"><span class="badge cold">Frio</span></div></div><div class="lead-card" draggable="true"><div class="company">Móveis Ideal</div><div class="meta">Maricá · Móveis</div><div style="margin-top:8px"><span class="badge warm">Morno</span></div></div></div>
+          <div class="column" data-column="Agendados"><div class="col-head"><span class="col-title">Agendados</span><span class="count">2</span></div><div class="lead-card" draggable="true"><div class="company">Casa Verde</div><div class="meta">Niterói · Decoração</div><div style="margin-top:8px"><span class="badge hot">Quente</span></div></div><div class="lead-card" draggable="true"><div class="company">Dental Mais</div><div class="meta">Rio de Janeiro · Odonto</div><div style="margin-top:8px"><span class="badge warm">Morno</span></div></div></div>
+          <div class="column" data-column="Follow up"><div class="col-head"><span class="col-title">Follow up</span><span class="count">1</span></div><div class="lead-card" draggable="true"><div class="company">Boutique Essencial</div><div class="meta">Rio de Janeiro · Moda</div><div style="margin-top:8px"><span class="badge warm">Morno</span></div></div></div>
+          <div class="column" data-column="Convertidos"><div class="col-head"><span class="col-title">Convertidos</span><span class="count">1</span></div><div class="lead-card" draggable="true"><div class="company">Tech House</div><div class="meta">Niterói · Tecnologia</div><div style="margin-top:8px"><span class="badge success">Convertido</span></div></div></div>
+        </div></div>
+      </div>
+
+      <!-- MESSAGES -->
+      <div class="view" id="messages">
+        <div class="page-head"><div><h1>Mensagens</h1><p>Crie templates reutilizáveis para sua prospecção.</p></div><button class="btn primary" onclick="openModal('templateModal')"><i data-lucide="plus"></i>Novo template</button></div>
+        <div class="grid two">
+          <div class="card"><div class="card-head"><div><h2 class="section-title">Primeiro contato</h2><p class="section-sub">Atualizado há 2 horas</p></div><button class="icon-btn" onclick="openMenu(event)"><i data-lucide="more-horizontal"></i></button></div><p style="line-height:1.6">Olá, {nome}. Tudo bem? Notei que a empresa {empresa} atua na região e gostaria de apresentar uma oportunidade.</p><div><span class="badge success">{nome}</span> <span class="badge success">{empresa}</span></div></div>
+          <div class="card"><div class="card-head"><div><h2 class="section-title">Follow up</h2><p class="section-sub">Atualizado ontem</p></div><button class="icon-btn" onclick="openMenu(event)"><i data-lucide="more-horizontal"></i></button></div><p style="line-height:1.6">Olá, {nome}. Passando para saber se conseguiu avaliar nossa proposta para a {empresa}.</p><div><span class="badge success">{nome}</span> <span class="badge success">{empresa}</span></div></div>
+        </div>
+      </div>
+
+      <!-- GOALS -->
+      <div class="view" id="goals">
+        <div class="page-head"><div><h1>Metas</h1><p>Acompanhe objetivos, faturamento e lucro previsto.</p></div><button class="btn primary" onclick="openModal('goalModal')"><i data-lucide="plus"></i>Nova meta</button></div>
+        <div class="grid three">
+          <div class="card"><div class="kpi-label">Meta de conversões</div><div class="kpi-value">148 / 200</div><div class="progress"><span style="width:74%"></span></div><div class="meta">74% concluído</div></div>
+          <div class="card"><div class="kpi-label">Faturamento previsto</div><div class="kpi-value">R$ 100 mil</div><div class="meta">200 vendas × R$ 500</div></div>
+          <div class="card"><div class="kpi-label">Lucro previsto</div><div class="kpi-value">R$ 91,4 mil</div><div class="meta">Margem prevista: 91,4%</div></div>
+        </div>
+        <div class="card" style="margin-top:16px"><div class="card-head"><div><h2 class="section-title">Meta de setembro</h2><p class="section-sub">Período: 01/09/2026 a 30/09/2026</p></div><button class="btn secondary small" onclick="openModal('goalModal')"><i data-lucide="pencil"></i>Editar</button></div><div class="grid three"><div><div class="kpi-label">Conversões alvo</div><strong style="font-size:22px">200</strong></div><div><div class="kpi-label">Preço por venda</div><strong style="font-size:22px">R$ 500</strong></div><div><div class="kpi-label">Custo total previsto</div><strong style="font-size:22px">R$ 8.560</strong></div></div></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="view" id="settings">
+        <div class="page-head"><div><h1>Configurações</h1><p>Gerencie seu perfil e preferências da conta.</p></div><button class="btn primary" onclick="showToast('success','Configurações salvas','As alterações foram salvas com sucesso.')">Salvar alterações</button></div>
+        <div class="card"><div class="tabs"><button class="tab active">Meu perfil</button><button class="tab">Colaboradores</button><button class="tab">Notificações</button></div>
+          <div class="form-grid"><div class="field"><label>Nome</label><input class="input" value="Robson Milioli"></div><div class="field"><label>E-mail</label><input class="input" value="contato@exemplo.com"></div><div class="field"><label>Papel</label><input class="input" value="Administrador" disabled></div><div class="field"><label>Empresa</label><input class="input" value="Minha empresa"></div></div>
+        </div>
+        <div class="card" style="margin-top:16px"><div class="card-head"><div><h2 class="section-title">Notificações por e-mail</h2><p class="section-sub">Controle quais eventos deseja receber.</p></div></div>
+          <label style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border-light)">Criação de conta <input type="checkbox" class="checkbox" checked></label>
+          <label style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border-light)">Convite de colaborador <input type="checkbox" class="checkbox" checked></label>
+          <label style="display:flex;align-items:center;justify-content:space-between;padding:12px 0">Alertas de créditos <input type="checkbox" class="checkbox" checked></label>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeOverlays()"></div>
+<div class="modal" id="waModal">
+  <div class="modal-head"><h2>Enviar mensagem</h2><button class="close" onclick="closeOverlays()"><i data-lucide="x"></i></button></div>
+  <div class="modal-body">
+    <div class="field"><label>Template</label><select class="select" id="templateSelect"><option>Primeiro contato</option><option>Follow up</option></select></div>
+    <div class="field" style="margin-top:16px"><label>Preview</label><div class="preview"><div class="message-bubble" id="messagePreview">Olá, João. Tudo bem? Notei que a empresa Restaurante Aurora atua na região e gostaria de apresentar uma oportunidade.</div></div></div>
+  </div>
+  <div class="modal-foot"><button class="btn secondary" onclick="closeOverlays()">Cancelar</button><button class="btn primary" onclick="openWhatsApp()"><i data-lucide="message-circle"></i>Abrir WhatsApp</button></div>
+</div>
+
+<div class="modal" id="templateModal">
+  <div class="modal-head"><h2>Novo template</h2><button class="close" onclick="closeOverlays()"><i data-lucide="x"></i></button></div>
+  <div class="modal-body">
+    <div class="field"><label>Nome do template</label><input class="input" id="templateName" placeholder="Ex.: Primeiro contato"></div>
+    <div class="field" style="margin-top:16px"><label>Mensagem</label><textarea class="textarea" id="templateText" placeholder="Olá, {nome}. Tudo bem?"></textarea><small>Variáveis disponíveis: {nome} e {empresa}</small></div>
+    <div style="margin-top:12px;display:flex;gap:6px"><button class="badge success" onclick="insertVar('{nome}')">{nome}</button><button class="badge success" onclick="insertVar('{empresa}')">{empresa}</button></div>
+  </div>
+  <div class="modal-foot"><button class="btn secondary" onclick="closeOverlays()">Cancelar</button><button class="btn primary" onclick="saveTemplate()">Salvar template</button></div>
+</div>
+
+<div class="modal" id="goalModal">
+  <div class="modal-head"><h2>Nova meta</h2><button class="close" onclick="closeOverlays()"><i data-lucide="x"></i></button></div>
+  <div class="modal-body"><div class="form-grid"><div class="field full"><label>Nome da meta</label><input class="input" placeholder="Meta de setembro"></div><div class="field"><label>Mês</label><select class="select"><option>Setembro</option><option>Outubro</option></select></div><div class="field"><label>Conversões alvo</label><input class="input" type="number" value="200"></div><div class="field"><label>Preço de venda</label><input class="input" value="500"></div><div class="field"><label>Período</label><input class="input" value="01/09/2026 — 30/09/2026"></div></div></div>
+  <div class="modal-foot"><button class="btn secondary" onclick="closeOverlays()">Cancelar</button><button class="btn primary" onclick="closeOverlays();showToast('success','Meta criada','A nova meta foi cadastrada.')">Criar meta</button></div>
+</div>
+
+<div class="drawer" id="leadDrawer">
+  <div class="drawer-head"><h2>Detalhes do Lead</h2><button class="close" onclick="closeOverlays()"><i data-lucide="x"></i></button></div>
+  <div class="drawer-body">
+    <div style="display:flex;justify-content:space-between;align-items:center"><div><h3 style="margin:0;font-size:18px">Restaurante Aurora</h3><div class="meta">Restaurante · Rio de Janeiro</div></div><span class="badge hot">Quente</span></div>
+    <div class="tabs" style="margin-top:20px"><button class="tab active">Informações</button><button class="tab">Atividades</button><button class="tab">Agenda</button></div>
+    <div class="grid" style="gap:16px"><div><div class="kpi-label">Telefone</div><div style="margin-top:4px">(21) 99999-1111</div></div><div><div class="kpi-label">Endereço</div><div style="margin-top:4px">Av. Central, 1200 — Rio de Janeiro</div></div><div><div class="kpi-label">Site</div><div style="margin-top:4px"><span class="badge hot">Sem site</span></div></div><div><div class="kpi-label">Redes sociais</div><div style="margin-top:7px;display:flex;gap:7px"><button class="btn secondary small">Instagram</button><button class="btn secondary small">Facebook</button></div></div></div>
+    <div style="margin-top:24px"><h3 style="font-size:14px">Agendar retorno</h3><div class="form-grid"><div class="field"><label>Data</label><input class="input" type="date"></div><div class="field"><label>Hora</label><input class="input" type="time"></div><div class="field full"><label>Motivo</label><input class="input" placeholder="Ex.: Retornar proposta"></div><div class="field full"><label>Anotações</label><textarea class="textarea" placeholder="Observações do atendimento"></textarea></div></div></div>
+  </div>
+  <div class="drawer-foot"><button class="btn secondary" onclick="closeOverlays()">Cancelar</button><button class="btn primary" onclick="closeOverlays();showToast('success','Agendamento criado','Retorno agendado com sucesso.')">Agendar retorno</button></div>
+</div>
+
+<div class="drawer" id="filterDrawer">
+  <div class="drawer-head"><h2>Filtros avançados</h2><button class="close" onclick="closeOverlays()"><i data-lucide="x"></i></button></div>
+  <div class="drawer-body"><div class="grid" style="gap:16px">
+    <div class="field"><label>Temperatura</label><div style="display:flex;gap:8px;flex-wrap:wrap"><label><input type="checkbox" class="checkbox"> Frio</label><label><input type="checkbox" class="checkbox"> Morno</label><label><input type="checkbox" class="checkbox"> Quente</label></div></div>
+    <div class="field"><label>Cidade</label><input class="input" placeholder="Buscar cidade"></div>
+    <div class="field"><label>Segmento</label><input class="input" placeholder="Ex.: restaurante"></div>
+    <div class="field"><label>Origem</label><select class="select"><option>Todas as capturas</option><option>Captura de hoje</option><option>Captura anterior</option></select></div>
+    <div class="field"><label>Site</label><select class="select"><option>Todos</option><option>Com site</option><option>Sem site</option></select></div>
+  </div></div>
+  <div class="drawer-foot"><button class="btn subtle" onclick="showToast('info','Filtros limpos','Os filtros foram redefinidos.')">Limpar filtros</button><button class="btn primary" onclick="closeOverlays();showToast('success','Filtros aplicados','A listagem foi atualizada.')">Aplicar filtros</button></div>
+</div>
+
+<div class="menu" id="contextMenu">
+  <button class="menu-item"><i data-lucide="pencil"></i>Editar</button>
+  <button class="menu-item"><i data-lucide="copy"></i>Duplicar</button>
+  <button class="menu-item"><i data-lucide="archive"></i>Arquivar</button>
+  <button class="menu-item danger" onclick="closeMenu();showToast('error','Lead excluído','O lead foi removido.')"><i data-lucide="trash-2"></i>Excluir</button>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+
+const THEME_KEY='leadflow-theme';
+function getSystemTheme(){return window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
+function applyTheme(mode, persist=true){
+  const resolved=mode==='system'?getSystemTheme():mode;
+  document.documentElement.setAttribute('data-theme',resolved);
+  document.documentElement.dataset.themePreference=mode;
+  if(persist) localStorage.setItem(THEME_KEY,mode);
+  $$('.theme-option').forEach(btn=>btn.classList.toggle('active',btn.dataset.themeChoice===mode));
+}
+const savedTheme=localStorage.getItem(THEME_KEY)||'system';
+applyTheme(savedTheme,false);
+const themeMedia=window.matchMedia('(prefers-color-scheme: dark)');
+themeMedia.addEventListener?.('change',()=>{if((localStorage.getItem(THEME_KEY)||'system')==='system') applyTheme('system',false)});
+$$('.theme-option').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();applyTheme(btn.dataset.themeChoice,true);showToast('success','Tema atualizado',btn.dataset.themeChoice==='system'?'Tema seguindo as preferências do sistema.':btn.dataset.themeChoice==='dark'?'Modo escuro ativado.':'Modo claro ativado.')}));
+
+lucide.createIcons();
+
+function activateView(view){
+  $$('.view').forEach(v=>v.classList.remove('active'));
+  const target=document.getElementById(view); if(target) target.classList.add('active');
+  $$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
+  const names={dashboard:'Dashboard',capture:'Capturar Leads',leads:'Leads Capturados',crm:'Pipeline',messages:'Mensagens',goals:'Metas',settings:'Configurações'};
+  $('#topTitle').textContent=names[view]||'LeadFlow CRM'; $('#crumbText').textContent=names[view]||'';
+  $('#userPanel')?.classList.remove('show');
+  if(innerWidth<=760) $('#sidebar').classList.remove('mobile-open');
+}
+$$('[data-view]').forEach(el=>el.addEventListener('click',()=>activateView(el.dataset.view)));
+
+$('#collapseBtn').addEventListener('click',()=>{
+  $('#sidebar').classList.toggle('collapsed');$('#main').classList.toggle('expanded');
+  $('#collapseBtn i').setAttribute('data-lucide',$('#sidebar').classList.contains('collapsed')?'panel-left-open':'panel-left-close');lucide.createIcons();
+});
+$('#menuBtn').addEventListener('click',()=>{
+  if(innerWidth<=760) $('#sidebar').classList.toggle('mobile-open');
+  else {$('#sidebar').classList.toggle('collapsed');$('#main').classList.toggle('expanded')}
+});
+$('#notifBtn').addEventListener('click',e=>{e.stopPropagation();$('#notifPanel').classList.toggle('show');$('#userPanel').classList.remove('show')});
+$('#userBtn').addEventListener('click',e=>{e.stopPropagation();$('#userPanel').classList.toggle('show');$('#notifPanel').classList.remove('show')});
+document.addEventListener('click',()=>{$('#notifPanel').classList.remove('show');$('#userPanel').classList.remove('show');closeMenu()});
+
+function openModal(id){closeOverlays();$('#overlay').classList.add('show');$('#'+id).classList.add('show')}
+function openDrawer(id){closeOverlays();$('#overlay').classList.add('show');$('#'+id).classList.add('show')}
+function closeOverlays(){$('#overlay').classList.remove('show');$$('.modal,.drawer').forEach(x=>x.classList.remove('show'));closeMenu()}
+function openMenu(e){e.stopPropagation();const m=$('#contextMenu');m.classList.remove('show');const r=e.currentTarget.getBoundingClientRect();m.style.left=Math.min(r.left,innerWidth-210)+'px';m.style.top=Math.min(r.bottom+5,innerHeight-180)+'px';m.classList.add('show')}
+function closeMenu(){$('#contextMenu').classList.remove('show')}
+function showToast(type,title,msg){
+ const t=document.createElement('div');t.className='toast '+type+'-t';
+ const icons={success:'circle-check',error:'circle-x',warn:'triangle-alert',info:'info'};
+ t.innerHTML='<i data-lucide="'+icons[type]+'"></i><div><strong>'+title+'</strong><p>'+msg+'</p></div><button class="x" onclick="this.parentElement.remove()"><i data-lucide="x"></i></button>';
+ $('#toastStack').appendChild(t);lucide.createIcons();setTimeout(()=>t.remove(),4500);
+}
+$('#captureBtn').addEventListener('click',()=>{
+ const b=$('#captureBtn');b.disabled=true;b.innerHTML='<i data-lucide="loader-circle"></i>Processando...';lucide.createIcons();
+ setTimeout(()=>{b.disabled=false;b.innerHTML='<i data-lucide="search"></i>Iniciar captura';lucide.createIcons();showToast('success','Captura iniciada','A busca foi adicionada à fila de processamento.')},1000);
+});
+function openWhatsApp(){closeOverlays();showToast('info','WhatsApp','Abrindo conversa com mensagem preenchida.')}
+function saveTemplate(){const n=$('#templateName').value.trim()||'Novo template';closeOverlays();showToast('success','Template salvo',n+' foi criado com sucesso.')}
+function insertVar(v){const ta=$('#templateText');const start=ta.selectionStart,end=ta.selectionEnd;ta.value=ta.value.slice(0,start)+v+ta.value.slice(end);ta.focus();ta.selectionStart=ta.selectionEnd=start+v.length}
+function filterRows(value){const q=value.toLowerCase();$$('#leadTable tbody tr').forEach(r=>r.style.display=r.innerText.toLowerCase().includes(q)?'':'none')}
+let dragged=null;
+$$('.lead-card').forEach(card=>{card.addEventListener('dragstart',()=>{dragged=card;setTimeout(()=>card.style.opacity='.45',0)});card.addEventListener('dragend',()=>{card.style.opacity='';dragged=null;$$('.column').forEach(c=>c.classList.remove('drop'))})});
+$$('.column').forEach(col=>{col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('drop')});col.addEventListener('dragleave',()=>col.classList.remove('drop'));col.addEventListener('drop',e=>{e.preventDefault();if(dragged){col.appendChild(dragged);showToast('success','Lead movido','O lead foi movido para '+col.dataset.column+'.')}col.classList.remove('drop')})});
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{const group=t.parentElement;group.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active')}));
+window.addEventListener('resize',()=>{if(innerWidth>760) $('#sidebar').classList.remove('mobile-open')});
+</script>
+</body>
+</html>
