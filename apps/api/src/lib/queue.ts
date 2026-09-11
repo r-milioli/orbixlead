@@ -25,3 +25,21 @@ export const scrapingQueue = new Queue<ScrapingJobPayload>(SCRAPING_QUEUE, {
 export async function enqueueScrapingJob(payload: ScrapingJobPayload) {
   return scrapingQueue.add("scrape", payload, { jobId: payload.jobId });
 }
+
+/** Remove job from BullMQ (waiting/delayed/active if possible). */
+export async function removeScrapingJob(jobId: string): Promise<boolean> {
+  const job = await scrapingQueue.getJob(jobId);
+  if (!job) return false;
+  try {
+    await job.remove();
+    return true;
+  } catch {
+    // Active jobs may not remove cleanly; try discard
+    try {
+      await job.discard();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}

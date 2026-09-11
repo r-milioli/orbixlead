@@ -4,9 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
+  ActionIcon,
   Anchor,
   Button,
   Card,
+  Center,
   Divider,
   Group,
   Loader,
@@ -17,11 +19,11 @@ import {
   Textarea,
   TextInput,
   Title,
-  Center,
+  Tooltip,
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
 import { notifications } from "@mantine/notifications";
-import { ArrowLeft, MessageCircle, Phone, Trash2 } from "lucide-react";
+import { ArrowLeft, Globe, MapPin, MessageCircle, Phone, Trash2 } from "lucide-react";
 import dayjs from "dayjs";
 import { TemperatureBadge } from "@/components/common/TemperatureBadge";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
@@ -30,7 +32,12 @@ import { useAuth } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import type { Lead, PipelineStage, ScheduleItem } from "@/lib/types";
 import { unwrapList, unwrapOne } from "@/lib/unwrap";
-import { colors } from "@/theme/tokens";
+import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+
+function websiteHref(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
+}
 
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
@@ -204,20 +211,35 @@ export default function LeadDetailPage() {
         <Group>
           <Button
             variant="default"
-            leftSection={<Phone size={16} />}
+            leftSection={<Phone size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
             component="a"
             href={`tel:${lead.phoneE164}`}
           >
             Ligar
           </Button>
-          <Button leftSection={<MessageCircle size={16} />} onClick={() => setWaOpen(true)}>
+          <Button
+            leftSection={<MessageCircle size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+            onClick={() => setWaOpen(true)}
+          >
             WhatsApp
           </Button>
+          {lead.mapsUrl ? (
+            <Button
+              variant="light"
+              leftSection={<MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+              component="a"
+              href={lead.mapsUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Maps
+            </Button>
+          ) : null}
           {isAdmin ? (
             <Button
               color="red"
               variant="light"
-              leftSection={<Trash2 size={16} />}
+              leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
               onClick={() => setConfirmDeleteOpen(true)}
             >
               Excluir
@@ -241,7 +263,62 @@ export default function LeadDetailPage() {
             <TextInput label="Telefone" value={lead.phoneE164} readOnly />
             <TextInput label="Cidade" value={lead.city || ""} readOnly />
             <TextInput label="Endereço" value={lead.address || ""} readOnly />
-            <TextInput label="Site" value={lead.website || "Sem site"} readOnly />
+            <TextInput
+              label="Site"
+              value={lead.website || "Sem site"}
+              readOnly
+              rightSection={
+                lead.website ? (
+                  <Tooltip label="Abrir site">
+                    <ActionIcon
+                      component="a"
+                      href={websiteHref(lead.website)}
+                      target="_blank"
+                      rel="noreferrer"
+                      variant="subtle"
+                      color="orbix"
+                      aria-label="Abrir site"
+                    >
+                      <Globe size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                    </ActionIcon>
+                  </Tooltip>
+                ) : (
+                  <Tooltip label="Site não disponível">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      disabled
+                      aria-label="Site não disponível"
+                    >
+                      <Globe size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                    </ActionIcon>
+                  </Tooltip>
+                )
+              }
+              rightSectionPointerEvents="all"
+            />
+            <div>
+              <Text size="sm" fw={600} mb={6}>
+                Google Maps
+              </Text>
+              {lead.mapsUrl ? (
+                <Button
+                  component="a"
+                  href={lead.mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="default"
+                  size="sm"
+                  leftSection={<MapPin size={16} strokeWidth={ICON_STROKE} />}
+                >
+                  Abrir perfil
+                </Button>
+              ) : (
+                <Text size="sm" c={colors.textMuted}>
+                  Não disponível
+                </Text>
+              )}
+            </div>
             <div>
               <Text size="sm" fw={600} mb={4}>
                 Redes sociais

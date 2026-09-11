@@ -10,7 +10,7 @@ export type PipelineSlug =
   | "converted"
   | "lost";
 
-export type JobStatus = "queued" | "running" | "completed" | "failed";
+export type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 export type CreditLedgerType =
   | "grant"

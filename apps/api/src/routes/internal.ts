@@ -36,7 +36,13 @@ router.post(
   asyncHandler(async (req, res) => {
     const job = await prisma.scrapingJob.findUnique({ where: { id: req.params.id } });
     if (!job) return res.status(404).json({ error: "Job não encontrado" });
-    if (job.status === JobStatus.COMPLETED || job.status === JobStatus.FAILED) {
+    if (job.status === JobStatus.CANCELLED) {
+      return res.status(409).json({ error: "cancelled", status: "cancelled" });
+    }
+    if (
+      job.status === JobStatus.COMPLETED ||
+      job.status === JobStatus.FAILED
+    ) {
       return res.status(400).json({ error: "Job já finalizado" });
     }
 
@@ -78,6 +84,9 @@ router.post(
 
     const job = await prisma.scrapingJob.findUnique({ where: { id: req.params.id } });
     if (!job) return res.status(404).json({ error: "Job não encontrado" });
+    if (job.status === JobStatus.CANCELLED) {
+      return res.json({ ok: true, ignored: true, status: "cancelled" });
+    }
 
     const logs = Array.isArray(job.logs) ? [...(job.logs as unknown[])] : [];
     if (body.log) {
@@ -111,6 +120,7 @@ router.post(
               city: z.string().optional(),
               address: z.string().optional(),
               website: z.string().optional(),
+              mapsUrl: z.string().optional(),
               socialUrls: z.array(z.string()).optional(),
               rating: z.number().optional(),
               reviewCount: z.number().int().optional(),
@@ -123,6 +133,9 @@ router.post(
 
     const job = await prisma.scrapingJob.findUnique({ where: { id: req.params.id } });
     if (!job) return res.status(404).json({ error: "Job não encontrado" });
+    if (job.status === JobStatus.CANCELLED) {
+      return res.json({ ok: true, ignored: true, status: "cancelled" });
+    }
     if (job.status === JobStatus.COMPLETED || job.status === JobStatus.FAILED) {
       return res.status(400).json({ error: "Job já finalizado" });
     }
@@ -173,6 +186,7 @@ router.post(
             city: item.city,
             address: item.address,
             website: item.website,
+            mapsUrl: item.mapsUrl,
             socialUrls,
             hasWebsite,
             isDuplicate: true,
@@ -196,6 +210,7 @@ router.post(
           city: item.city,
           address: item.address,
           website: item.website,
+          mapsUrl: item.mapsUrl,
           socialUrls,
           hasWebsite,
           isDuplicate: false,
@@ -288,6 +303,12 @@ router.post(
 
     const job = await prisma.scrapingJob.findUnique({ where: { id: req.params.id } });
     if (!job) return res.status(404).json({ error: "Job não encontrado" });
+    if (job.status === JobStatus.CANCELLED) {
+      return res.json({ ok: true, ignored: true, status: "cancelled" });
+    }
+    if (job.status === JobStatus.COMPLETED || job.status === JobStatus.FAILED) {
+      return res.status(400).json({ error: "Job já finalizado" });
+    }
 
     const isFinal = body.final ?? true;
 

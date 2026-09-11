@@ -17,12 +17,30 @@ import type { ScrapeParams, ScrapedResult } from "./types.js";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
+export type MapsLogFn = (
+  level: "info" | "warn" | "error",
+  msg: string,
+  meta?: Record<string, unknown>
+) => void;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 function humanDelay(minMs = 400, maxMs = 1400): Promise<void> {
   return sleep(minMs + Math.floor(Math.random() * (maxMs - minMs)));
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function parseRating(text: string | null | undefined): number | null {
@@ -96,7 +114,25 @@ async function hrefOrNull(page: Page, selectors: string[]): Promise<string | nul
   return null;
 }
 
-async function extractPlace(page: Page, city: string): Promise<ScrapedResult | null> {
+/** Normaliza URL de perfil /maps/place/ (Google Maps / Meu Negócio). */
+function resolveMapsUrl(candidate: string | null | undefined): string | null {
+  if (!candidate) return null;
+  try {
+    const u = new URL(candidate, "https://www.google.com");
+    if (!u.hostname.includes("google.") || !u.pathname.includes("/maps/place/")) {
+      return null;
+    }
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function extractPlace(
+  page: Page,
+  city: string,
+  mapsUrlHint?: string
+): Promise<ScrapedResult | null> {
   const companyName = await textOrNull(page, [
     "h1.DUwDvf",
     "h1.fontHeadlineLarge",
@@ -161,6 +197,7 @@ async function extractPlace(page: Page, city: string): Promise<ScrapedResult | n
   });
 
   const phoneE164 = phoneRaw ? normalizePhoneE164(phoneRaw) : null;
+  const mapsUrl = resolveMapsUrl(mapsUrlHint) ?? resolveMapsUrl(page.url());
 
   return {
     companyName,
@@ -172,6 +209,7 @@ async function extractPlace(page: Page, city: string): Promise<ScrapedResult | n
     city,
     address,
     website,
+    mapsUrl,
     socialUrls,
     hasWebsite,
   };
@@ -213,17 +251,24 @@ async function collectFeedHrefs(page: Page, limit: number): Promise<string[]> {
  * Basic Google Maps search: `${segment} in ${city}, Brazil`.
  * Throws on hard failure so BullMQ retries.
  */
-export async function scrapeMaps(params: ScrapeParams): Promise<ScrapedResult[]> {
+export async function scrapeMaps(
+  params: ScrapeParams,
+  log?: MapsLogFn
+): Promise<ScrapedResult[]> {
   const { city, segment, quantity } = params;
   const n = Math.max(1, Math.min(quantity, 100));
   const query = `${segment} in ${city}, Brazil`;
+  // ~45s por place + overhead de busca; mínimo 2 min, máximo 12 min
+  const budgetMs = Math.min(12 * 60_000, Math.max(120_000, n * 45_000 + 60_000));
+
+  log?.("info", "maps.launch", { query, quantity: n, budgetSec: Math.round(budgetMs / 1000) });
 
   const browser = await chromium.launch({
     headless: true,
     args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
   });
 
-  try {
+  const scrape = async (): Promise<ScrapedResult[]> => {
     const context = await browser.newContext({
       userAgent: USER_AGENT,
       locale: "pt-BR",
@@ -232,57 +277,94 @@ export async function scrapeMaps(params: ScrapeParams): Promise<ScrapedResult[]>
     const page = await context.newPage();
 
     const searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+    log?.("info", "maps.search", { searchUrl });
     await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await humanDelay(1200, 2200);
     await dismissConsent(page);
     await humanDelay(800, 1600);
+    log?.("info", "maps.page_ready", { url: page.url() });
 
-    // Wait for results feed or a single place panel
     const hasFeed = await page
       .locator('div[role="feed"]')
       .first()
       .isVisible({ timeout: 15_000 })
       .catch(() => false);
 
+    log?.("info", "maps.feed", { hasFeed });
+
     const results: ScrapedResult[] = [];
     const seenNames = new Set<string>();
 
     if (!hasFeed) {
-      // Possibly landed on a single place
       const one = await extractPlace(page, city);
       if (!one) {
-        throw new Error(`Maps: no feed and no place panel for query "${query}"`);
+        throw new Error(
+          `Maps: sem lista de resultados nem painel de lugar para "${query}". URL: ${page.url()}`
+        );
       }
+      log?.("info", "maps.single_place", { companyName: one.companyName });
       return [one];
     }
 
     const hrefs = await collectFeedHrefs(page, Math.min(n * 2, 40));
+    log?.("info", "maps.place_links", { found: hrefs.length, target: n });
     if (hrefs.length === 0) {
-      throw new Error(`Maps: zero place links for query "${query}"`);
+      throw new Error(`Maps: zero links /maps/place/ para a busca "${query}"`);
     }
 
-    for (const href of hrefs) {
+    for (let i = 0; i < hrefs.length; i++) {
       if (results.length >= n) break;
+      const href = hrefs[i]!;
+      log?.("info", "maps.place_open", {
+        index: i + 1,
+        of: hrefs.length,
+        collected: results.length,
+        target: n,
+      });
       try {
         await page.goto(href, { waitUntil: "domcontentloaded", timeout: 45_000 });
         await humanDelay(700, 1500);
-        const item = await extractPlace(page, city);
-        if (!item) continue;
+        const item = await extractPlace(page, city, href);
+        if (!item) {
+          log?.("warn", "maps.place_skip", { reason: "extract_null", index: i + 1 });
+          continue;
+        }
         const key = item.companyName.toLowerCase();
-        if (seenNames.has(key)) continue;
+        if (seenNames.has(key)) {
+          log?.("warn", "maps.place_skip", {
+            reason: "duplicate_name",
+            companyName: item.companyName,
+          });
+          continue;
+        }
         seenNames.add(key);
         results.push(item);
-      } catch {
-        // skip fragile cards; continue
+        log?.("info", "maps.place_ok", {
+          companyName: item.companyName,
+          hasPhone: Boolean(item.phoneE164 || item.phoneRaw),
+          mapsUrl: Boolean(item.mapsUrl),
+          collected: results.length,
+        });
+      } catch (err) {
+        log?.("warn", "maps.place_error", {
+          index: i + 1,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
     if (results.length === 0) {
-      throw new Error(`Maps: failed to extract any places for "${query}"`);
+      throw new Error(`Maps: não extraiu nenhum lugar para "${query}"`);
     }
 
+    log?.("info", "maps.done", { count: results.length });
     return results.slice(0, n);
+  };
+
+  try {
+    return await withTimeout(scrape(), budgetMs, `Maps scrape (${query})`);
   } finally {
     await browser.close().catch(() => undefined);
+    log?.("info", "maps.browser_closed", {});
   }
 }

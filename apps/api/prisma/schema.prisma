@@ -32,6 +32,7 @@ enum JobStatus {
   RUNNING
   COMPLETED
   FAILED
+  CANCELLED
 }
 
 enum GoalPeriodType {
@@ -178,6 +179,7 @@ model Lead {
   country               String       @default("BR")
   address               String?
   website               String?
+  mapsUrl               String?      @map("maps_url")
   socialUrls            Json?        @map("social_urls")
   hasWebsite            Boolean      @default(false) @map("has_website")
   segment               String?
@@ -242,6 +244,7 @@ model ScrapingResult {
   city          String?
   address       String?
   website       String?
+  mapsUrl       String?      @map("maps_url")
   socialUrls    Json?        @map("social_urls")
   hasWebsite    Boolean      @default(false) @map("has_website")
   isDuplicate   Boolean      @default(false) @map("is_duplicate")

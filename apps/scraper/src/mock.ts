@@ -116,6 +116,7 @@ function buildResult(
   });
 
   const phoneE164 = phoneRaw ? normalizePhoneE164(phoneRaw) : null;
+  const slug = slugify(companyName) || "empresa";
 
   return {
     companyName,
@@ -127,6 +128,7 @@ function buildResult(
     city,
     address: `Rua ${pick(SECOND_NAMES)}, ${randInt(10, 999)} — ${city}`,
     website,
+    mapsUrl: `https://www.google.com/maps/place/${slug}`,
     socialUrls,
     hasWebsite,
   };

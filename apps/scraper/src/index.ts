@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { Worker, type Job } from "bullmq";
 import { Redis } from "ioredis";
 import {
+  JobCancelledError,
   notifyJobComplete,
   notifyJobFail,
   notifyJobStart,
@@ -58,13 +59,20 @@ async function processJob(job: Job<ScrapingJobData>): Promise<void> {
     };
 
     const results =
-      MODE === "playwright" ? await scrapeMaps(params) : await scrapeMock(params);
+      MODE === "playwright"
+        ? await scrapeMaps(params, (level, msg, meta) => log(level, msg, { jobId, ...meta }))
+        : await scrapeMock(params);
 
     log("info", "job.scraped", { jobId, count: results.length, mode: MODE });
 
     await notifyJobComplete(jobId, results);
     log("info", "job.completed", { jobId, count: results.length });
   } catch (err) {
+    if (err instanceof JobCancelledError) {
+      log("info", "job.aborted_cancelled", { jobId });
+      return;
+    }
+
     const message = err instanceof Error ? err.message : String(err);
     log("error", "job.failed", { jobId, message, attempt, maxAttempts, isLastAttempt });
 
@@ -72,9 +80,15 @@ async function processJob(job: Job<ScrapingJobData>): Promise<void> {
       try {
         await notifyJobFail(jobId, message, { final: isLastAttempt, attempt });
       } catch (notifyErr) {
+        const notifyMessage = notifyErr instanceof Error ? notifyErr.message : String(notifyErr);
+        // Job may have been cancelled while scraping — ignore late fail
+        if (notifyMessage.includes("cancelled") || notifyMessage.includes("409")) {
+          log("info", "job.fail_ignored_cancelled", { jobId });
+          return;
+        }
         log("error", "job.fail_notify_error", {
           jobId,
-          message: notifyErr instanceof Error ? notifyErr.message : String(notifyErr),
+          message: notifyMessage,
         });
       }
     }
@@ -103,9 +117,12 @@ function main() {
     maxRetriesPerRequest: null,
   });
 
+  // Playwright pode levar vários minutos; default do BullMQ (30s) causa stall silencioso.
   const worker = new Worker<ScrapingJobData>(QUEUE_NAME, processJob, {
     connection,
     concurrency: 1,
+    lockDuration: 12 * 60_000,
+    stalledInterval: 60_000,
   });
 
   worker.on("ready", () => {

@@ -80,9 +80,9 @@ Copy-Item .env.example .env
 | --- | --- |
 | `SMTP_USER` / `SMTP_PASS` | Envio real de e-mail (Brevo). Se vazio, os links de convite/reset aparecem no **log da API**. |
 | `SESSION_SECRET` | Troque em qualquer ambiente compartilhado. |
-| `SCRAPER_MODE=playwright` | Só quando for testar scraping real (requer Playwright instalado no scraper). |
+| `SCRAPER_MODE=playwright` | Scraping real no Google Maps (requer Chromium do Playwright — passo 5 abaixo). Padrão em dev: `mock`. |
 
-Para o primeiro boot em dev, **não é obrigatório** configurar SMTP.
+Para o primeiro boot em dev, **não é obrigatório** configurar SMTP nem alternar para `playwright`.
 
 ---
 
@@ -101,6 +101,24 @@ Em seguida, compile o package compartilhado (necessário para a API/scraper impo
 ```bash
 pnpm --filter @orbixlead/shared build
 ```
+
+### Chromium do Playwright (scraper)
+
+O pacote `playwright` no npm **não** baixa o browser sozinho. Instale o Chromium uma vez (obrigatório se for usar `SCRAPER_MODE=playwright`; recomendado já no setup para não travar depois):
+
+```bash
+pnpm --filter @orbixlead/scraper exec playwright install chromium
+```
+
+No Windows (PowerShell), o mesmo comando na raiz do monorepo.
+
+Se o Playwright pedir dependências de sistema (mais comum em Linux), use:
+
+```bash
+pnpm --filter @orbixlead/scraper exec playwright install --with-deps chromium
+```
+
+> Em modo `mock` o worker sobe sem Chromium. Sem o browser instalado, jobs com `SCRAPER_MODE=playwright` falham ao abrir o Chromium.
 
 ---
 
@@ -206,11 +224,13 @@ Esperado:
 pnpm dev:scraper
 ```
 
-Esperado:
+Esperado (com `SCRAPER_MODE=mock` no `.env`):
 
 ```text
 worker.ready  queue: scraping  mode: mock
 ```
+
+Com `SCRAPER_MODE=playwright`, o log deve mostrar `mode: playwright` (e o Chromium precisa estar instalado — seção 5).
 
 Sem o scraper, as capturas ficam em `queued` e não concluem.
 
@@ -256,13 +276,16 @@ Se a captura não concluir: confira se o **Terminal 3 (scraper)** está rodando 
 1. cp .env.example .env
 2. pnpm install
 3. pnpm --filter @orbixlead/shared build
-4. docker compose up -d postgres redis
-5. pnpm db:setup
-6. pnpm dev:api
-7. pnpm dev:web
-8. pnpm dev:scraper
-9. Abrir http://localhost:3000  →  demo@orbixlead.local
+4. pnpm --filter @orbixlead/scraper exec playwright install chromium
+5. docker compose up -d postgres redis
+6. pnpm db:setup
+7. pnpm dev:api
+8. pnpm dev:web
+9. pnpm dev:scraper
+10. Abrir http://localhost:3000  →  demo@orbixlead.local
 ```
+
+Para captura real no Maps: no `.env`, `SCRAPER_MODE=playwright`, reinicie o Terminal 3 (`pnpm dev:scraper`).
 
 ---
 
@@ -295,6 +318,8 @@ docker compose down -v
 | Login funciona na API mas não na web | `WEB_ORIGIN=http://localhost:3000`; web em `3000` e rewrite `/api` |
 | Captura fica em `queued` | Scraper rodando? Redis up? `REDIS_URL` igual na API e no scraper |
 | `Cannot find module @orbixlead/shared` | `pnpm --filter @orbixlead/shared build` |
+| Playwright / Chromium não encontrado | `pnpm --filter @orbixlead/scraper exec playwright install chromium` |
+| Captura `playwright` falha ao abrir browser | Chromium instalado? Reiniciou o `pnpm dev:scraper` após mudar `SCRAPER_MODE`? |
 | Convite / reset sem e-mail | Normal sem SMTP — veja o link no log da API (`email_skipped_no_smtp`) |
 | Porta 3000/4000 ocupada | Encerre o processo antigo ou altere a porta no script/env |
 
@@ -311,6 +336,9 @@ pnpm db:seed
 
 # Build do shared em watch (opcional)
 pnpm --filter @orbixlead/shared dev
+
+# (Re)instalar Chromium do Playwright
+pnpm --filter @orbixlead/scraper exec playwright install chromium
 ```
 
 ---
@@ -318,7 +346,7 @@ pnpm --filter @orbixlead/shared dev
 ## 15. Próximos passos (fora do escopo deste guia)
 
 - Configurar Brevo (`SMTP_*`) para e-mails reais  
-- Alternar `SCRAPER_MODE=playwright` e instalar browsers do Playwright no `apps/scraper`  
+- Com Chromium já instalado (seção 5): alternar `SCRAPER_MODE=playwright` no `.env` e reiniciar o scraper  
 - Subir a stack completa com `docker compose up --build` (além do modo “só infra + apps locais”)
 
 ---

@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 import { maxJobQuantity, normalizeCompanyName } from "@orbixlead/shared";
-import { Role, Temperature } from "@prisma/client";
+import { JobStatus, Prisma, Role, Temperature } from "@prisma/client";
 import { prisma } from "../lib/prisma";
-import { enqueueScrapingJob } from "../lib/queue";
+import { enqueueScrapingJob, removeScrapingJob } from "../lib/queue";
 import { asyncHandler } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
-import { reserve } from "../services/credits";
+import { releaseReservation, reserve } from "../services/credits";
 
 const router = Router();
 
@@ -104,6 +104,7 @@ router.get(
         city: r.city ?? r.job.city,
         address: r.address,
         website: r.website,
+        mapsUrl: r.mapsUrl,
         socialUrls: r.socialUrls,
         hasWebsite: r.hasWebsite,
         isDuplicate: r.isDuplicate,
@@ -114,6 +115,22 @@ router.get(
         createdAt: r.createdAt.toISOString(),
       })),
     });
+  })
+);
+
+router.get(
+  "/jobs",
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const takeRaw = typeof req.query.take === "string" ? Number(req.query.take) : 50;
+    const take = Number.isFinite(takeRaw) ? Math.min(Math.max(Math.trunc(takeRaw), 1), 100) : 50;
+
+    const jobs = await prisma.scrapingJob.findMany({
+      where: { tenantId: req.user!.tenantId! },
+      orderBy: { createdAt: "desc" },
+      take,
+    });
+
+    return res.json({ jobs: jobs.map(serializeJob) });
   })
 );
 
@@ -186,6 +203,49 @@ router.post(
   })
 );
 
+router.post(
+  "/:id/cancel",
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const job = await prisma.scrapingJob.findFirst({
+      where: { id: req.params.id, tenantId: req.user!.tenantId! },
+    });
+    if (!job) return res.status(404).json({ error: "Job não encontrado" });
+
+    if (job.status !== JobStatus.QUEUED && job.status !== JobStatus.RUNNING) {
+      return res.status(400).json({
+        error: "Só é possível cancelar capturas na fila ou em processamento",
+      });
+    }
+
+    await removeScrapingJob(job.id);
+
+    const releaseAmount = Math.max(0, job.reservedCredits - job.settledCredits);
+    if (releaseAmount > 0) {
+      await releaseReservation({
+        tenantId: job.tenantId,
+        amount: releaseAmount,
+        jobId: job.id,
+        note: `Release cancelamento captura ${job.id}`,
+      });
+    }
+
+    const logs = Array.isArray(job.logs) ? [...(job.logs as unknown[])] : [];
+    logs.push({ at: new Date().toISOString(), message: "user.cancel" });
+
+    const updated = await prisma.scrapingJob.update({
+      where: { id: job.id },
+      data: {
+        status: JobStatus.CANCELLED,
+        errorMessage: "Cancelado pelo usuário",
+        finishedAt: new Date(),
+        logs: logs as Prisma.InputJsonValue,
+      },
+    });
+
+    return res.json({ job: serializeJob(updated) });
+  })
+);
+
 router.get(
   "/:id",
   asyncHandler(async (req: AuthedRequest, res) => {
@@ -223,6 +283,7 @@ router.get(
         city: r.city,
         address: r.address,
         website: r.website,
+        mapsUrl: r.mapsUrl,
         socialUrls: r.socialUrls,
         hasWebsite: r.hasWebsite,
         isDuplicate: r.isDuplicate,
@@ -319,6 +380,7 @@ router.post(
             city: result.city ?? result.job.city,
             address: result.address,
             website: result.website,
+            mapsUrl: result.mapsUrl,
             socialUrls: result.socialUrls ?? undefined,
             hasWebsite: result.hasWebsite,
             segment: result.job.segment,

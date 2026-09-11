@@ -1,5 +1,12 @@
 import type { JobStartInfo, ScrapedResult } from "./types.js";
 
+export class JobCancelledError extends Error {
+  constructor(jobId: string) {
+    super(`Job ${jobId} was cancelled`);
+    this.name = "JobCancelledError";
+  }
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required env: ${name}`);
@@ -55,6 +62,7 @@ function toApiResults(results: ScrapedResult[]) {
     ...(r.city ? { city: r.city } : {}),
     ...(r.address ? { address: r.address } : {}),
     ...(r.website ? { website: r.website } : {}),
+    ...(r.mapsUrl ? { mapsUrl: r.mapsUrl } : {}),
     ...(r.socialUrls?.length ? { socialUrls: r.socialUrls } : {}),
     ...(typeof r.rating === "number" ? { rating: r.rating } : {}),
     ...(typeof r.reviewCount === "number" ? { reviewCount: r.reviewCount } : {}),
@@ -66,12 +74,34 @@ function toApiResults(results: ScrapedResult[]) {
  * POST /api/v1/internal/jobs/:id/start
  */
 export async function notifyJobStart(jobId: string): Promise<JobStartInfo> {
-  const data = await request<JobStartInfo | { job: JobStartInfo }>(
-    "POST",
-    `/api/v1/internal/jobs/${jobId}/start`
-  );
+  const url = `${baseUrl()}/api/v1/internal/jobs/${jobId}/start`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: headers(),
+  });
 
-  const job = "job" in data && data.job ? data.job : (data as JobStartInfo);
+  const text = await res.text().catch(() => "");
+  let data: unknown = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON from API (${res.status}): ${text.slice(0, 200)}`);
+    }
+  }
+
+  if (res.status === 409) {
+    throw new JobCancelledError(jobId);
+  }
+
+  if (!res.ok) {
+    throw new Error(`API POST /api/v1/internal/jobs/${jobId}/start → ${res.status}: ${text.slice(0, 400)}`);
+  }
+
+  const job =
+    typeof data === "object" && data && "job" in data && (data as { job: JobStartInfo }).job
+      ? (data as { job: JobStartInfo }).job
+      : (data as JobStartInfo);
 
   if (!job?.id || !job.city || !job.segment || !job.quantity) {
     throw new Error(

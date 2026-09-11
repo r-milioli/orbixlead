@@ -23,6 +23,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import {
   KanbanSquare,
+  MapPin,
   MoreHorizontal,
   Search,
   SlidersHorizontal,
@@ -411,6 +412,19 @@ export default function LeadsPage() {
                             </ActionIcon>
                           </Menu.Target>
                           <Menu.Dropdown>
+                            {lead.mapsUrl ? (
+                              <Menu.Item
+                                component="a"
+                                href={lead.mapsUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                leftSection={
+                                  <MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                }
+                              >
+                                Abrir no Maps
+                              </Menu.Item>
+                            ) : null}
                             {canSelect ? (
                               <Menu.Item
                                 leftSection={
@@ -421,7 +435,7 @@ export default function LeadsPage() {
                                 Adicionar ao CRM
                               </Menu.Item>
                             ) : null}
-                            <Menu.Divider />
+                            {(lead.mapsUrl || canSelect) && <Menu.Divider />}
                             <Menu.Item
                               color="red"
                               leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}

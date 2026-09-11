@@ -33,6 +33,8 @@ export type ScrapedResult = {
   city?: string | null;
   address?: string | null;
   website?: string | null;
+  /** Link direto do perfil no Google Maps / Google Meu Negócio. */
+  mapsUrl?: string | null;
   socialUrls?: string[];
   hasWebsite: boolean;
 };

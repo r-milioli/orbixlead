@@ -17,6 +17,7 @@ export type Lead = {
   country?: string | null;
   address?: string | null;
   website?: string | null;
+  mapsUrl?: string | null;
   socialUrls?: string[] | Record<string, string> | null;
   hasWebsite?: boolean;
   segment?: string | null;
@@ -34,7 +35,7 @@ export type ScrapingJob = {
   city: string;
   segment: string;
   quantity: number;
-  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "queued" | "running" | "completed" | "failed";
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "queued" | "running" | "completed" | "failed" | "cancelled";
   reservedCredits: number;
   settledCredits: number;
   newCount: number;
@@ -58,6 +59,7 @@ export type ScrapingResult = {
   city?: string | null;
   address?: string | null;
   website?: string | null;
+  mapsUrl?: string | null;
   socialUrls?: unknown;
   hasWebsite: boolean;
   isDuplicate: boolean;

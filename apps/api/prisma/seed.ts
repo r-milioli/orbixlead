@@ -278,6 +278,7 @@ async function main() {
         state: def.state,
         country: "BR",
         website: def.website,
+        mapsUrl: `https://www.google.com/maps/place/${encodeURIComponent(def.companyName)}`,
         socialUrls: def.socialUrls,
         hasWebsite,
         segment: def.segment,

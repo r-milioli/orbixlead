@@ -38,6 +38,7 @@ function serializeLead(lead: {
   country: string;
   address: string | null;
   website: string | null;
+  mapsUrl: string | null;
   socialUrls: unknown;
   hasWebsite: boolean;
   segment: string | null;
@@ -64,6 +65,7 @@ function serializeLead(lead: {
     country: lead.country,
     address: lead.address,
     website: lead.website,
+    mapsUrl: lead.mapsUrl,
     socialUrls: lead.socialUrls,
     hasWebsite: lead.hasWebsite,
     segment: lead.segment,
@@ -95,6 +97,7 @@ router.get(
       "city",
       "state",
       "website",
+      "mapsUrl",
       "segment",
       "createdAt",
     ];
@@ -108,6 +111,7 @@ router.get(
         csvEscape(l.city),
         csvEscape(l.state ?? ""),
         csvEscape(l.website ?? ""),
+        csvEscape(l.mapsUrl ?? ""),
         csvEscape(l.segment ?? ""),
         l.createdAt.toISOString(),
       ].join(",")
@@ -169,6 +173,7 @@ router.post(
         city: z.string().min(1),
         state: z.string().optional(),
         website: z.string().url().optional().or(z.literal("")),
+        mapsUrl: z.string().url().optional().or(z.literal("")),
         segment: z.string().optional(),
         notes: z.string().optional(),
         stageId: z.string().optional(),
@@ -223,6 +228,7 @@ router.post(
           city: body.city,
           state: body.state,
           website: body.website || null,
+          mapsUrl: body.mapsUrl || null,
           socialUrls: body.socialUrls ?? [],
           hasWebsite,
           segment: body.segment,
