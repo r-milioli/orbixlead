@@ -2,10 +2,13 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import {
+  ActionIcon,
   Badge,
   Button,
   Card,
   Group,
+  Menu,
+  Modal,
   NumberInput,
   PasswordInput,
   Select,
@@ -19,7 +22,8 @@ import {
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { Download } from "lucide-react";
+import { Download, MoreHorizontal, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useAuth } from "@/lib/auth";
 import { api, apiBlob, ApiError } from "@/lib/api";
@@ -70,9 +74,15 @@ export default function ConfiguracoesPage() {
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "operador">("operador");
+  const [editingInvite, setEditingInvite] = useState<InviteRow | null>(null);
+  const [editInviteRole, setEditInviteRole] = useState<"admin" | "operador">("operador");
+  const [pendingDeleteInvite, setPendingDeleteInvite] = useState<InviteRow | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [savingInvite, setSavingInvite] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [deletingInvite, setDeletingInvite] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [loadingCollabs, setLoadingCollabs] = useState(false);
 
@@ -260,6 +270,106 @@ export default function ConfiguracoesPage() {
     }
   };
 
+  const openEditInvite = (row: InviteRow) => {
+    setEditingInvite(row);
+    setEditInviteRole(row.role === "admin" ? "admin" : "operador");
+  };
+
+  const saveInviteRole = async () => {
+    if (!editingInvite) return;
+    setSavingInvite(true);
+    try {
+      const data = await api<{ invite: InviteRow }>(
+        `/api/v1/collaborators/invites/${editingInvite.id}`,
+        {
+          method: "PATCH",
+          body: { role: editInviteRole },
+        }
+      );
+      setInvites((prev) =>
+        prev.map((row) => (row.id === editingInvite.id ? { ...row, ...data.invite } : row))
+      );
+      setEditingInvite(null);
+      notifications.show({
+        color: "green",
+        title: "Convite atualizado",
+        message: "O papel do convite foi alterado.",
+      });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao atualizar o convite.",
+      });
+    } finally {
+      setSavingInvite(false);
+    }
+  };
+
+  const resendInvite = async (row: InviteRow) => {
+    setResendingId(row.id);
+    try {
+      const data = await api<{ invite: InviteRow }>(
+        `/api/v1/collaborators/invites/${row.id}/resend`,
+        { method: "POST" }
+      );
+      setInvites((prev) =>
+        prev.map((inviteRow) =>
+          inviteRow.id === row.id ? { ...inviteRow, ...data.invite } : inviteRow
+        )
+      );
+      notifications.show({
+        color: "green",
+        title: "Convite reenviado",
+        message: `Um novo link foi enviado para ${row.email}.`,
+      });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao reenviar o convite.",
+      });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const deleteInvite = async () => {
+    if (!pendingDeleteInvite) return;
+    setDeletingInvite(true);
+    try {
+      await api(`/api/v1/collaborators/invites/${pendingDeleteInvite.id}`, {
+        method: "DELETE",
+      });
+      setInvites((prev) => prev.filter((row) => row.id !== pendingDeleteInvite.id));
+      setPendingDeleteInvite(null);
+      notifications.show({
+        color: "green",
+        title: "Convite revogado",
+        message: "O link de convite não poderá mais ser usado.",
+      });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao revogar o convite.",
+      });
+    } finally {
+      setDeletingInvite(false);
+    }
+  };
+
+  const formatInviteExpiry = (iso: string) => {
+    const date = new Date(iso);
+    const expired = date.getTime() < Date.now();
+    const label = date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    return { label, expired };
+  };
+
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -411,11 +521,128 @@ export default function ConfiguracoesPage() {
 
                 <div>
                   <Title order={4} mb="md">
+                    Convites pendentes
+                  </Title>
+                  {loadingCollabs ? (
+                    <Text size="sm" c={colors.textMuted}>
+                      Carregando...
+                    </Text>
+                  ) : invites.length === 0 ? (
+                    <Text size="sm" c={colors.textMuted}>
+                      Nenhum convite pendente.
+                    </Text>
+                  ) : (
+                    <Table.ScrollContainer minWidth={560}>
+                      <Table verticalSpacing="sm" highlightOnHover>
+                        <Table.Thead style={{ background: colors.background }}>
+                          <Table.Tr>
+                            <Table.Th>E-mail</Table.Th>
+                            <Table.Th>Papel</Table.Th>
+                            <Table.Th>Expira em</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                            <Table.Th w={56} />
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {invites.map((i) => {
+                            const expiry = formatInviteExpiry(i.expiresAt);
+                            return (
+                              <Table.Tr key={i.id}>
+                                <Table.Td>
+                                  <Text size="sm">{i.email}</Text>
+                                </Table.Td>
+                                <Table.Td>
+                                  <Badge variant="light" color="gray">
+                                    {i.role === "admin" ? "Admin" : "Operador"}
+                                  </Badge>
+                                </Table.Td>
+                                <Table.Td>
+                                  <Text size="sm" c={expiry.expired ? "red" : undefined}>
+                                    {expiry.label}
+                                    {expiry.expired ? " (expirado)" : ""}
+                                  </Text>
+                                </Table.Td>
+                                <Table.Td>
+                                  <Badge
+                                    variant="light"
+                                    color={expiry.expired ? "red" : "orbix"}
+                                  >
+                                    {expiry.expired ? "Expirado" : "Pendente"}
+                                  </Badge>
+                                </Table.Td>
+                                <Table.Td>
+                                  <Menu
+                                    shadow="md"
+                                    width={200}
+                                    position="bottom-end"
+                                    withinPortal
+                                  >
+                                    <Menu.Target>
+                                      <ActionIcon
+                                        variant="subtle"
+                                        color="gray"
+                                        aria-label="Ações do convite"
+                                        loading={resendingId === i.id}
+                                      >
+                                        <MoreHorizontal
+                                          size={ICON_SIZE}
+                                          strokeWidth={ICON_STROKE}
+                                        />
+                                      </ActionIcon>
+                                    </Menu.Target>
+                                    <Menu.Dropdown>
+                                      <Menu.Item
+                                        leftSection={
+                                          <Pencil size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                        }
+                                        onClick={() => openEditInvite(i)}
+                                      >
+                                        Editar papel
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        leftSection={
+                                          <RefreshCw
+                                            size={ICON_SIZE}
+                                            strokeWidth={ICON_STROKE}
+                                          />
+                                        }
+                                        onClick={() => void resendInvite(i)}
+                                      >
+                                        Reenviar e-mail
+                                      </Menu.Item>
+                                      <Menu.Divider />
+                                      <Menu.Item
+                                        color="red"
+                                        leftSection={
+                                          <Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                        }
+                                        onClick={() => setPendingDeleteInvite(i)}
+                                      >
+                                        Revogar
+                                      </Menu.Item>
+                                    </Menu.Dropdown>
+                                  </Menu>
+                                </Table.Td>
+                              </Table.Tr>
+                            );
+                          })}
+                        </Table.Tbody>
+                      </Table>
+                    </Table.ScrollContainer>
+                  )}
+                </div>
+
+                <div>
+                  <Title order={4} mb="md">
                     Equipe
                   </Title>
                   {loadingCollabs ? (
                     <Text size="sm" c={colors.textMuted}>
                       Carregando...
+                    </Text>
+                  ) : users.length === 0 ? (
+                    <Text size="sm" c={colors.textMuted}>
+                      Nenhum colaborador ativo.
                     </Text>
                   ) : (
                     <Table.ScrollContainer minWidth={560}>
@@ -497,39 +724,58 @@ export default function ConfiguracoesPage() {
                               </Table.Td>
                             </Table.Tr>
                           ))}
-                          {invites.map((i) => (
-                            <Table.Tr key={i.id}>
-                              <Table.Td>
-                                <Text size="sm" c={colors.textMuted}>
-                                  —
-                                </Text>
-                              </Table.Td>
-                              <Table.Td>
-                                <Text size="sm">{i.email}</Text>
-                              </Table.Td>
-                              <Table.Td>
-                                <Badge variant="light" color="gray">
-                                  {i.role === "admin" ? "Admin" : "Operador"}
-                                </Badge>
-                              </Table.Td>
-                              <Table.Td>
-                                <Text size="sm" c={colors.textMuted}>
-                                  —
-                                </Text>
-                              </Table.Td>
-                              <Table.Td>
-                                <Badge variant="light" color="orbix">
-                                  Convite pendente
-                                </Badge>
-                              </Table.Td>
-                            </Table.Tr>
-                          ))}
                         </Table.Tbody>
                       </Table>
                     </Table.ScrollContainer>
                   )}
                 </div>
               </Stack>
+
+              <Modal
+                opened={Boolean(editingInvite)}
+                onClose={savingInvite ? () => undefined : () => setEditingInvite(null)}
+                title="Editar convite"
+                centered
+                radius="lg"
+              >
+                <Stack gap="md">
+                  <TextInput label="E-mail" value={editingInvite?.email || ""} disabled />
+                  <Select
+                    label="Papel"
+                    data={[
+                      { value: "operador", label: "Operador" },
+                      { value: "admin", label: "Admin" },
+                    ]}
+                    value={editInviteRole}
+                    onChange={(value) =>
+                      setEditInviteRole((value as "admin" | "operador") || "operador")
+                    }
+                    allowDeselect={false}
+                  />
+                  <Group justify="flex-end" gap="sm">
+                    <Button
+                      variant="default"
+                      onClick={() => setEditingInvite(null)}
+                      disabled={savingInvite}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button loading={savingInvite} onClick={() => void saveInviteRole()}>
+                      Salvar
+                    </Button>
+                  </Group>
+                </Stack>
+              </Modal>
+
+              <ConfirmModal
+                opened={Boolean(pendingDeleteInvite)}
+                onClose={() => setPendingDeleteInvite(null)}
+                onConfirm={deleteInvite}
+                title="Revogar convite"
+                message={`Tem certeza que deseja revogar o convite de "${pendingDeleteInvite?.email ?? ""}"? O link enviado deixará de funcionar.`}
+                confirmLabel="Revogar"
+                loading={deletingInvite}
+              />
             </Tabs.Panel>
           ) : null}
 

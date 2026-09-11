@@ -1,17 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Button,
-  Paper,
-  PasswordInput,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
+import { Anchor, Button, PasswordInput, Stack, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { AuthShell } from "@/components/common/AuthShell";
 import { api, ApiError } from "@/lib/api";
 import { colors } from "@/theme/tokens";
 
@@ -61,52 +55,42 @@ export default function ConvitePage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background: colors.background,
-      }}
+    <AuthShell
+      subtitle="Aceitar convite — defina seu nome e senha para acessar."
+      footer={
+        <Anchor component={Link} href="/login" size="sm" c={colors.primary}>
+          Já tem conta? Entrar
+        </Anchor>
+      }
     >
-      <Paper w="100%" maw={420} p="xl" withBorder>
-        <Stack gap="lg">
-          <div>
-            <Title order={2} c={colors.textPrimary}>
-              Aceitar convite
-            </Title>
-            <Text size="sm" c={colors.textSecondary} mt={4}>
-              Defina seu nome e senha para acessar o Orbixlead.
-            </Text>
-          </div>
-          <form onSubmit={onSubmit}>
-            <Stack gap="md">
-              <TextInput
-                label="Nome"
-                required
-                value={name}
-                onChange={(e) => setName(e.currentTarget.value)}
-              />
-              <PasswordInput
-                label="Senha"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.currentTarget.value)}
-              />
-              <PasswordInput
-                label="Confirmar senha"
-                required
-                value={confirm}
-                onChange={(e) => setConfirm(e.currentTarget.value)}
-              />
-              <Button type="submit" loading={loading} fullWidth>
-                Ativar conta
-              </Button>
-            </Stack>
-          </form>
+      <form onSubmit={onSubmit}>
+        <Stack gap="md">
+          <TextInput
+            label="Nome"
+            required
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+            placeholder="Seu nome"
+          />
+          <PasswordInput
+            label="Senha"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.currentTarget.value)}
+            placeholder="Mínimo 8 caracteres"
+          />
+          <PasswordInput
+            label="Confirmar senha"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.currentTarget.value)}
+            placeholder="Repita a senha"
+          />
+          <Button type="submit" loading={loading} fullWidth>
+            Ativar conta
+          </Button>
         </Stack>
-      </Paper>
-    </div>
+      </form>
+    </AuthShell>
   );
 }

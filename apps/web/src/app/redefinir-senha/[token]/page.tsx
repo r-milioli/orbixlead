@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Button, Paper, PasswordInput, Stack, Text, Title } from "@mantine/core";
+import { Anchor, Button, PasswordInput, Stack } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { AuthShell } from "@/components/common/AuthShell";
 import { api, ApiError } from "@/lib/api";
 import { colors } from "@/theme/tokens";
 
@@ -48,44 +50,35 @@ export default function RedefinirSenhaPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background: colors.background,
-      }}
+    <AuthShell
+      subtitle="Redefinir senha — escolha uma nova senha para sua conta."
+      footer={
+        <Anchor component={Link} href="/login" size="sm" c={colors.primary}>
+          Voltar ao login
+        </Anchor>
+      }
     >
-      <Paper w="100%" maw={420} p="xl" withBorder>
-        <Stack gap="lg">
-          <div>
-            <Title order={2}>Redefinir senha</Title>
-            <Text size="sm" c={colors.textSecondary} mt={4}>
-              Escolha uma nova senha para sua conta.
-            </Text>
-          </div>
-          <form onSubmit={onSubmit}>
-            <Stack gap="md">
-              <PasswordInput
-                label="Nova senha"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.currentTarget.value)}
-              />
-              <PasswordInput
-                label="Confirmar senha"
-                required
-                value={confirm}
-                onChange={(e) => setConfirm(e.currentTarget.value)}
-              />
-              <Button type="submit" loading={loading} fullWidth>
-                Salvar senha
-              </Button>
-            </Stack>
-          </form>
+      <form onSubmit={onSubmit}>
+        <Stack gap="md">
+          <PasswordInput
+            label="Nova senha"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.currentTarget.value)}
+            placeholder="Mínimo 8 caracteres"
+          />
+          <PasswordInput
+            label="Confirmar senha"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.currentTarget.value)}
+            placeholder="Repita a senha"
+          />
+          <Button type="submit" loading={loading} fullWidth>
+            Salvar senha
+          </Button>
         </Stack>
-      </Paper>
-    </div>
+      </form>
+    </AuthShell>
   );
 }

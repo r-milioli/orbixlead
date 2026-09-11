@@ -1,20 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  Anchor,
-  Button,
-  Group,
-  Paper,
-  PasswordInput,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
+import { Anchor, Button, PasswordInput, Stack, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { AuthShell } from "@/components/common/AuthShell";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { colors } from "@/theme/tokens";
@@ -64,70 +54,41 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background: `linear-gradient(180deg, ${colors.primaryLight} 0%, ${colors.background} 42%)`,
-      }}
-    >
-      <Paper w="100%" maw={420} p="xl" withBorder radius="md" shadow="sm">
-        <Stack gap="lg">
-          <div>
-            <Group gap={10} mb={8}>
-              <Image src="/logo.png" alt="Orbixlead" width={44} height={44} priority />
-              <Title order={2} style={{ letterSpacing: "-0.02em" }}>
-                <Text span c={colors.primary} inherit>
-                  Orbix
-                </Text>
-                <Text span c={colors.textPrimary} inherit>
-                  lead
-                </Text>
-              </Title>
-            </Group>
-            <Text size="sm" c={colors.textSecondary}>
-              {forgotMode ? "Recuperar acesso" : "Entre na sua conta"}
-            </Text>
-          </div>
-
-          <form onSubmit={onSubmit}>
-            <Stack gap="md">
-              <TextInput
-                label="E-mail"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.currentTarget.value)}
-                placeholder="voce@empresa.com"
-              />
-              {!forgotMode ? (
-                <PasswordInput
-                  label="Senha"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.currentTarget.value)}
-                  placeholder="Sua senha"
-                />
-              ) : null}
-              <Button type="submit" fullWidth loading={loading}>
-                {forgotMode ? "Enviar link" : "Entrar"}
-              </Button>
-            </Stack>
-          </form>
-
-          <Anchor
-            component="button"
-            type="button"
-            size="sm"
-            c={colors.primary}
-            onClick={() => setForgotMode((v) => !v)}
-          >
-            {forgotMode ? "Voltar ao login" : "Esqueci minha senha"}
-          </Anchor>
+    <AuthShell subtitle={forgotMode ? "Recuperar acesso" : "Entre na sua conta"}>
+      <form onSubmit={onSubmit}>
+        <Stack gap="md">
+          <TextInput
+            label="E-mail"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.currentTarget.value)}
+            placeholder="voce@empresa.com"
+          />
+          {!forgotMode ? (
+            <PasswordInput
+              label="Senha"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+              placeholder="Sua senha"
+            />
+          ) : null}
+          <Button type="submit" fullWidth loading={loading}>
+            {forgotMode ? "Enviar link" : "Entrar"}
+          </Button>
         </Stack>
-      </Paper>
-    </div>
+      </form>
+
+      <Anchor
+        component="button"
+        type="button"
+        size="sm"
+        c={colors.primary}
+        onClick={() => setForgotMode((v) => !v)}
+      >
+        {forgotMode ? "Voltar ao login" : "Esqueci minha senha"}
+      </Anchor>
+    </AuthShell>
   );
 }
