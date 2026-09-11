@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   ActionIcon,
   Badge,
+  Box,
   Button,
   Card,
   Group,
@@ -21,13 +22,14 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { Download, MoreHorizontal, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useAuth } from "@/lib/auth";
 import { api, apiBlob, ApiError } from "@/lib/api";
-import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 type SettingsEnvelope = {
   settings: {
@@ -57,6 +59,11 @@ type InviteRow = {
 
 export default function ConfiguracoesPage() {
   const { user, refresh, setTenant, tenant, isAdmin } = useAuth();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
+  const menuWidth = isMobile ? "calc(100vw - 16px)" : 200;
+  const cardPad = isMobile ? "md" : "lg";
   const [tab, setTab] = useState<string | null>("perfil");
 
   const [name, setName] = useState("");
@@ -400,28 +407,42 @@ export default function ConfiguracoesPage() {
         title="Configurações"
         subtitle={
           isAdmin
-            ? "Gerencie seu perfil e preferências da conta."
+            ? isMobile
+              ? "Perfil e preferências da conta"
+              : "Gerencie seu perfil e preferências da conta."
             : "Atualize seu nome e senha de acesso."
         }
         actions={
           tab === "perfil" ? (
-            <Button loading={saving} onClick={() => void saveProfile()}>
-              Salvar alterações
+            <Button size={isMobile ? "sm" : "md"} loading={saving} onClick={() => void saveProfile()}>
+              {isMobile ? "Salvar" : "Salvar alterações"}
             </Button>
           ) : tab === "notificacoes" && isAdmin ? (
-            <Button loading={saving} onClick={() => void saveNotifications()}>
-              Salvar alterações
+            <Button
+              size={isMobile ? "sm" : "md"}
+              loading={saving}
+              onClick={() => void saveNotifications()}
+            >
+              {isMobile ? "Salvar" : "Salvar alterações"}
             </Button>
           ) : undefined
         }
       />
 
-      <Card padding="lg">
+      <Card padding={cardPad} style={{ minWidth: 0 }}>
         <Tabs value={tab} onChange={setTab} color="orbix">
-          <Tabs.List mb="lg">
-            <Tabs.Tab value="perfil">Meu perfil</Tabs.Tab>
-            {isAdmin ? <Tabs.Tab value="colaboradores">Colaboradores</Tabs.Tab> : null}
-            {isAdmin ? <Tabs.Tab value="notificacoes">Notificações</Tabs.Tab> : null}
+          <Tabs.List mb="lg" grow={!!isMobile}>
+            <Tabs.Tab value="perfil">{isMobile ? "Perfil" : "Meu perfil"}</Tabs.Tab>
+            {isAdmin ? (
+              <Tabs.Tab value="colaboradores">
+                {isMobile ? "Equipe" : "Colaboradores"}
+              </Tabs.Tab>
+            ) : null}
+            {isAdmin ? (
+              <Tabs.Tab value="notificacoes">
+                {isMobile ? "E-mails" : "Notificações"}
+              </Tabs.Tab>
+            ) : null}
           </Tabs.List>
 
           <Tabs.Panel value="perfil">
@@ -432,10 +453,26 @@ export default function ConfiguracoesPage() {
                   value={name}
                   onChange={(e) => setName(e.currentTarget.value)}
                   required
+                  size={isMobile ? "sm" : "md"}
                 />
-                <TextInput label="E-mail" value={user?.email || ""} disabled />
-                <TextInput label="Papel" value={roleLabel} disabled />
-                <TextInput label="Empresa" value={tenant?.name || ""} disabled />
+                <TextInput
+                  label="E-mail"
+                  value={user?.email || ""}
+                  disabled
+                  size={isMobile ? "sm" : "md"}
+                />
+                <TextInput
+                  label="Papel"
+                  value={roleLabel}
+                  disabled
+                  size={isMobile ? "sm" : "md"}
+                />
+                <TextInput
+                  label="Empresa"
+                  value={tenant?.name || ""}
+                  disabled
+                  size={isMobile ? "sm" : "md"}
+                />
                 {isAdmin ? (
                   <NumberInput
                     label="Custo médio do lead (R$)"
@@ -445,13 +482,16 @@ export default function ConfiguracoesPage() {
                     min={0}
                     value={avgLeadCost}
                     onChange={setAvgLeadCost}
+                    size={isMobile ? "sm" : "md"}
                   />
                 ) : null}
               </SimpleGrid>
 
               {isAdmin ? (
                 <Stack gap="sm" mt="xl">
-                  <Title order={4}>Exportação LGPD</Title>
+                  <Title order={4} style={{ fontSize: isMobile ? 16 : undefined }}>
+                    Exportação LGPD
+                  </Title>
                   <Text size="sm" c={colors.textSecondary}>
                     Baixe um CSV com os leads do tenant. Soft-delete individual está disponível na
                     página do lead.
@@ -460,7 +500,8 @@ export default function ConfiguracoesPage() {
                     leftSection={<Download size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
                     loading={exporting}
                     onClick={() => void exportCsv()}
-                    w="fit-content"
+                    fullWidth={!!isMobile}
+                    w={isMobile ? undefined : "fit-content"}
                     variant="light"
                   >
                     Exportar CSV
@@ -478,6 +519,7 @@ export default function ConfiguracoesPage() {
               setNewPassword={setNewPassword}
               setConfirmPassword={setConfirmPassword}
               onSubmit={savePassword}
+              compact={!!isMobile}
             />
           </Tabs.Panel>
 
@@ -485,7 +527,7 @@ export default function ConfiguracoesPage() {
             <Tabs.Panel value="colaboradores">
               <Stack gap="lg">
                 <form onSubmit={invite}>
-                  <Title order={4} mb={4}>
+                  <Title order={4} mb={4} style={{ fontSize: isMobile ? 16 : undefined }}>
                     Convidar colaborador
                   </Title>
                   <Text size="sm" c={colors.textSecondary} mb="md">
@@ -498,6 +540,7 @@ export default function ConfiguracoesPage() {
                       required
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.currentTarget.value)}
+                      size={isMobile ? "sm" : "md"}
                     />
                     <Select
                       label="Papel"
@@ -510,9 +553,10 @@ export default function ConfiguracoesPage() {
                         setInviteRole((value as "admin" | "operador") || "operador")
                       }
                       allowDeselect={false}
+                      size={isMobile ? "sm" : "md"}
                     />
-                    <Group align="flex-end">
-                      <Button type="submit" loading={inviting}>
+                    <Group align="flex-end" grow={!!isMobile}>
+                      <Button type="submit" loading={inviting} fullWidth={!!isMobile}>
                         Enviar convite
                       </Button>
                     </Group>
@@ -520,7 +564,7 @@ export default function ConfiguracoesPage() {
                 </form>
 
                 <div>
-                  <Title order={4} mb="md">
+                  <Title order={4} mb="md" style={{ fontSize: isMobile ? 16 : undefined }}>
                     Convites pendentes
                   </Title>
                   {loadingCollabs ? (
@@ -531,6 +575,88 @@ export default function ConfiguracoesPage() {
                     <Text size="sm" c={colors.textMuted}>
                       Nenhum convite pendente.
                     </Text>
+                  ) : isMobile ? (
+                    <Stack gap={10}>
+                      {invites.map((i) => {
+                        const expiry = formatInviteExpiry(i.expiresAt);
+                        return (
+                          <Box
+                            key={i.id}
+                            style={{
+                              border: `1px solid ${colors.borderLight}`,
+                              borderRadius: 10,
+                              padding: 12,
+                              minWidth: 0,
+                            }}
+                          >
+                            <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm" mb={8}>
+                              <Box style={{ minWidth: 0, flex: 1 }}>
+                                <Text size="sm" fw={600} style={{ wordBreak: "break-all" }}>
+                                  {i.email}
+                                </Text>
+                                <Text size="xs" c={expiry.expired ? "red" : colors.textMuted} mt={4}>
+                                  {expiry.label}
+                                  {expiry.expired ? " (expirado)" : ""}
+                                </Text>
+                              </Box>
+                              <Menu
+                                shadow="md"
+                                width={menuWidth}
+                                position="bottom-end"
+                                withinPortal
+                              >
+                                <Menu.Target>
+                                  <ActionIcon
+                                    variant="subtle"
+                                    color="gray"
+                                    aria-label="Ações do convite"
+                                    loading={resendingId === i.id}
+                                  >
+                                    <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                  </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                  <Menu.Item
+                                    leftSection={
+                                      <Pencil size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                    }
+                                    onClick={() => openEditInvite(i)}
+                                  >
+                                    Editar papel
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    leftSection={
+                                      <RefreshCw size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                    }
+                                    onClick={() => void resendInvite(i)}
+                                  >
+                                    Reenviar e-mail
+                                  </Menu.Item>
+                                  <Menu.Divider />
+                                  <Menu.Item
+                                    color="red"
+                                    leftSection={
+                                      <Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                    }
+                                    onClick={() => setPendingDeleteInvite(i)}
+                                  >
+                                    Revogar
+                                  </Menu.Item>
+                                </Menu.Dropdown>
+                              </Menu>
+                            </Group>
+                            <Group gap={8} wrap="wrap">
+                              <Badge variant="light" color="gray">
+                                {i.role === "admin" ? "Admin" : "Operador"}
+                              </Badge>
+                              <Badge variant="light" color={expiry.expired ? "red" : "orbix"}>
+                                {expiry.expired ? "Expirado" : "Pendente"}
+                              </Badge>
+                            </Group>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
                   ) : (
                     <Table.ScrollContainer minWidth={560}>
                       <Table verticalSpacing="sm" highlightOnHover>
@@ -633,7 +759,7 @@ export default function ConfiguracoesPage() {
                 </div>
 
                 <div>
-                  <Title order={4} mb="md">
+                  <Title order={4} mb="md" style={{ fontSize: isMobile ? 16 : undefined }}>
                     Equipe
                   </Title>
                   {loadingCollabs ? (
@@ -644,6 +770,78 @@ export default function ConfiguracoesPage() {
                     <Text size="sm" c={colors.textMuted}>
                       Nenhum colaborador ativo.
                     </Text>
+                  ) : isMobile ? (
+                    <Stack gap={10}>
+                      {users.map((u) => (
+                        <Box
+                          key={u.id}
+                          style={{
+                            border: `1px solid ${colors.borderLight}`,
+                            borderRadius: 10,
+                            padding: 12,
+                            minWidth: 0,
+                          }}
+                        >
+                          <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm" mb={8}>
+                            <Box style={{ minWidth: 0, flex: 1 }}>
+                              <Text size="sm" fw={600} lineClamp={1}>
+                                {u.name}
+                              </Text>
+                              <Text size="xs" c={colors.textMuted} style={{ wordBreak: "break-all" }}>
+                                {u.email}
+                              </Text>
+                            </Box>
+                            <Badge variant="light" color="green" style={{ flexShrink: 0 }}>
+                              Ativo
+                            </Badge>
+                          </Group>
+                          <Group gap={8} mb={u.role === "operador" ? 10 : 0} wrap="wrap">
+                            <Badge variant="light" color="gray">
+                              {u.role === "admin" ? "Admin" : "Operador"}
+                            </Badge>
+                          </Group>
+                          {u.role === "operador" ? (
+                            <Switch
+                              size="sm"
+                              checked={u.canCapture !== false}
+                              onChange={() => {
+                                const next = !(u.canCapture !== false);
+                                void (async () => {
+                                  try {
+                                    await api(`/api/v1/collaborators/${u.id}`, {
+                                      method: "PATCH",
+                                      body: { canCapture: next },
+                                    });
+                                    setUsers((prev) =>
+                                      prev.map((row) =>
+                                        row.id === u.id ? { ...row, canCapture: next } : row
+                                      )
+                                    );
+                                    notifications.show({
+                                      color: "green",
+                                      title: "Permissão atualizada",
+                                      message: next
+                                        ? "Operador pode capturar leads."
+                                        : "Captura desabilitada para o operador.",
+                                    });
+                                  } catch (err) {
+                                    notifications.show({
+                                      color: "red",
+                                      title: "Erro",
+                                      message:
+                                        err instanceof ApiError
+                                          ? err.message
+                                          : "Falha ao atualizar permissão.",
+                                    });
+                                  }
+                                })();
+                              }}
+                              label={u.canCapture !== false ? "Captura permitida" : "Captura bloqueada"}
+                            />
+                          ) : null}
+                        </Box>
+                      ))}
+                    </Stack>
                   ) : (
                     <Table.ScrollContainer minWidth={560}>
                       <Table verticalSpacing="sm" highlightOnHover>
@@ -737,6 +935,7 @@ export default function ConfiguracoesPage() {
                 title="Editar convite"
                 centered
                 radius="lg"
+                fullScreen={!!isMobile}
               >
                 <Stack gap="md">
                   <TextInput label="E-mail" value={editingInvite?.email || ""} disabled />
@@ -752,7 +951,7 @@ export default function ConfiguracoesPage() {
                     }
                     allowDeselect={false}
                   />
-                  <Group justify="flex-end" gap="sm">
+                  <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} gap="sm" wrap="wrap">
                     <Button
                       variant="default"
                       onClick={() => setEditingInvite(null)}
@@ -782,7 +981,7 @@ export default function ConfiguracoesPage() {
           {isAdmin ? (
             <Tabs.Panel value="notificacoes">
               <form onSubmit={(e) => void saveNotifications(e)}>
-                <Title order={4} mb={4}>
+                <Title order={4} mb={4} style={{ fontSize: isMobile ? 16 : undefined }}>
                   Notificações por e-mail
                 </Title>
                 <Text size="sm" c={colors.textSecondary} mb="lg">
@@ -792,51 +991,58 @@ export default function ConfiguracoesPage() {
                   <Group
                     justify="space-between"
                     py="md"
+                    wrap="nowrap"
+                    gap="md"
                     style={{ borderBottom: `1px solid ${colors.borderLight}` }}
                   >
-                    <div>
+                    <Box style={{ minWidth: 0, flex: 1 }}>
                       <Text size="sm" fw={600}>
                         Convite de colaborador
                       </Text>
                       <Text size="xs" c={colors.textMuted}>
                         Quando um convite for aceito
                       </Text>
-                    </div>
+                    </Box>
                     <Switch
                       checked={emailNotifyInvite}
                       onChange={() => setEmailNotifyInvite((v) => !v)}
+                      style={{ flexShrink: 0 }}
                     />
                   </Group>
                   <Group
                     justify="space-between"
                     py="md"
+                    wrap="nowrap"
+                    gap="md"
                     style={{ borderBottom: `1px solid ${colors.borderLight}` }}
                   >
-                    <div>
+                    <Box style={{ minWidth: 0, flex: 1 }}>
                       <Text size="sm" fw={600}>
                         Captura concluída
                       </Text>
                       <Text size="xs" c={colors.textMuted}>
                         Ao finalizar uma busca de leads
                       </Text>
-                    </div>
+                    </Box>
                     <Switch
                       checked={emailNotifyCapture}
                       onChange={() => setEmailNotifyCapture((v) => !v)}
+                      style={{ flexShrink: 0 }}
                     />
                   </Group>
-                  <Group justify="space-between" py="md">
-                    <div>
+                  <Group justify="space-between" py="md" wrap="nowrap" gap="md">
+                    <Box style={{ minWidth: 0, flex: 1 }}>
                       <Text size="sm" fw={600}>
                         Alertas de créditos
                       </Text>
                       <Text size="xs" c={colors.textMuted}>
                         Quando o saldo estiver baixo ou esgotado
                       </Text>
-                    </div>
+                    </Box>
                     <Switch
                       checked={emailNotifyCredits}
                       onChange={() => setEmailNotifyCredits((v) => !v)}
+                      style={{ flexShrink: 0 }}
                     />
                   </Group>
                 </Stack>
@@ -858,6 +1064,7 @@ function DividerPasswordSection({
   setNewPassword,
   setConfirmPassword,
   onSubmit,
+  compact = false,
 }: {
   currentPassword: string;
   newPassword: string;
@@ -867,11 +1074,14 @@ function DividerPasswordSection({
   setNewPassword: (v: string) => void;
   setConfirmPassword: (v: string) => void;
   onSubmit: (e?: FormEvent) => void | Promise<void>;
+  compact?: boolean;
 }) {
   return (
     <form onSubmit={(e) => void onSubmit(e)}>
       <Stack gap="sm" mt="xl" pt="xl" style={{ borderTop: `1px solid ${colors.borderLight}` }}>
-        <Title order={4}>Alterar senha</Title>
+        <Title order={4} style={{ fontSize: compact ? 16 : undefined }}>
+          Alterar senha
+        </Title>
         <Text size="sm" c={colors.textSecondary}>
           Informe a senha atual e escolha uma nova com no mínimo 8 caracteres.
         </Text>
@@ -881,22 +1091,31 @@ function DividerPasswordSection({
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.currentTarget.value)}
             required
+            size={compact ? "sm" : "md"}
           />
-          <div />
+          {!compact ? <div /> : null}
           <PasswordInput
             label="Nova senha"
             value={newPassword}
             onChange={(e) => setNewPassword(e.currentTarget.value)}
             required
+            size={compact ? "sm" : "md"}
           />
           <PasswordInput
             label="Confirmar nova senha"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.currentTarget.value)}
             required
+            size={compact ? "sm" : "md"}
           />
         </SimpleGrid>
-        <Button type="submit" loading={savingPassword} w="fit-content" mt="sm">
+        <Button
+          type="submit"
+          loading={savingPassword}
+          fullWidth={compact}
+          w={compact ? undefined : "fit-content"}
+          mt="sm"
+        >
           Atualizar senha
         </Button>
       </Stack>
