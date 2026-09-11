@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  OPERADOR
+}
+
+enum Temperature {
+  FRIO
+  MORNO
+  QUENTE
+}
+
+enum CreditLedgerType {
+  GRANT
+  RESERVE
+  SETTLE
+  RELEASE
+  ADJUST
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum GoalPeriodType {
+  MONTHLY
+  WEEKLY
+  DAILY
+}
+
+model Tenant {
+  id              String    @id @default(cuid())
+  name            String
+  unlimited       Boolean   @default(false)
+  creditCap       Int       @default(0) @map("credit_cap")
+  creditRemaining Int       @default(0) @map("credit_remaining")
+  cycleEndsAt     DateTime? @map("cycle_ends_at")
+  avgLeadCost     Decimal?  @map("avg_lead_cost") @db.Decimal(10, 2)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  users           User[]
+  invites         Invite[]
+  creditLedgers   CreditLedger[]
+  pipelineStages  PipelineStage[]
+  leads           Lead[]
+  scrapingJobs    ScrapingJob[]
+  messageTemplates MessageTemplate[]
+  schedules       Schedule[]
+  goals           Goal[]
+  auditLogs       AuditLog[]
+
+  @@map("tenants")
+}
+
+model User {
+  id                   String   @id @default(cuid())
+  email                String   @unique
+  passwordHash         String?  @map("password_hash")
+  name                 String
+  role                 Role
+  tenantId             String?  @map("tenant_id")
+  emailNotifyInvite    Boolean  @default(true) @map("email_notify_invite")
+  emailNotifyCapture   Boolean  @default(true) @map("email_notify_capture")
+  emailNotifyCredits   Boolean  @default(true) @map("email_notify_credits")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  tenant               Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitesSent          Invite[] @relation("InvitedBy")
+  passwordResetTokens  PasswordResetToken[]
+  creditLedgers        CreditLedger[]
+  scrapingJobs         ScrapingJob[]
+  schedulesCreated     Schedule[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Session {
+  sid       String   @id
+  data      String
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  role        Role
+  token       String    @unique
+  tenantId    String    @map("tenant_id")
+  invitedById String    @map("invited_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("invites")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model CreditLedger {
+  id           String           @id @default(cuid())
+  tenantId     String           @map("tenant_id")
+  type         CreditLedgerType
+  amount       Int
+  balanceAfter Int?             @map("balance_after")
+  jobId        String?          @map("job_id")
+  note         String?
+  createdById  String?          @map("created_by_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy    User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@map("credit_ledger")
+}
+
+model PipelineStage {
+  id       String @id @default(cuid())
+  tenantId String @map("tenant_id")
+  slug     String
+  label    String
+  position Int
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leads    Lead[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, position])
+  @@map("pipeline_stages")
+}
+
+model Lead {
+  id                    String       @id @default(cuid())
+  tenantId              String       @map("tenant_id")
+  stageId               String       @map("stage_id")
+  companyName           String       @map("company_name")
+  companyNameNormalized String       @map("company_name_normalized")
+  phoneE164             String       @map("phone_e164")
+  temperature           Temperature
+  rating                Float?
+  reviewCount           Int?         @map("review_count")
+  city                  String
+  state                 String?
+  country               String       @default("BR")
+  address               String?
+  website               String?
+  socialUrls            Json?        @map("social_urls")
+  hasWebsite            Boolean      @default(false) @map("has_website")
+  segment               String?
+  scrapingJobId         String?      @map("scraping_job_id")
+  notes                 String?
+  softDeletedAt         DateTime?    @map("soft_deleted_at")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  tenant                Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stage                 PipelineStage @relation(fields: [stageId], references: [id])
+  scrapingJob           ScrapingJob? @relation(fields: [scrapingJobId], references: [id], onDelete: SetNull)
+  schedules             Schedule[]
+  scrapingResults       ScrapingResult[]
+
+  @@unique([tenantId, phoneE164, companyNameNormalized])
+  @@index([tenantId, stageId])
+  @@index([tenantId, softDeletedAt])
+  @@map("leads")
+}
+
+model ScrapingJob {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  requestedById   String    @map("requested_by_id")
+  country         String    @default("BR")
+  city            String
+  segment         String
+  quantity        Int
+  status          JobStatus @default(QUEUED)
+  reservedCredits Int       @map("reserved_credits")
+  settledCredits  Int       @default(0) @map("settled_credits")
+  newCount        Int       @default(0) @map("new_count")
+  existingCount   Int       @default(0) @map("existing_count")
+  discardedCount  Int       @default(0) @map("discarded_count")
+  errorMessage    String?   @map("error_message")
+  attempt         Int       @default(0)
+  logs            Json?
+  startedAt       DateTime? @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy     User      @relation(fields: [requestedById], references: [id])
+  results         ScrapingResult[]
+  leads           Lead[]
+
+  @@index([tenantId, createdAt])
+  @@index([status])
+  @@map("scraping_jobs")
+}
+
+model ScrapingResult {
+  id            String       @id @default(cuid())
+  jobId         String       @map("job_id")
+  companyName   String       @map("company_name")
+  phoneRaw      String?      @map("phone_raw")
+  phoneE164     String?      @map("phone_e164")
+  temperature   Temperature?
+  rating        Float?
+  reviewCount   Int?         @map("review_count")
+  city          String?
+  address       String?
+  website       String?
+  socialUrls    Json?        @map("social_urls")
+  hasWebsite    Boolean      @default(false) @map("has_website")
+  isDuplicate   Boolean      @default(false) @map("is_duplicate")
+  discarded     Boolean      @default(false)
+  softDeletedAt DateTime?    @map("soft_deleted_at")
+  leadId        String?      @map("lead_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  job           ScrapingJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  lead          Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([jobId])
+  @@map("scraping_results")
+}
+
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("message_templates")
+}
+
+model Schedule {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  leadId      String   @map("lead_id")
+  scheduledAt DateTime @map("scheduled_at")
+  reason      String
+  notes       String?
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  @@index([tenantId, scheduledAt])
+  @@index([leadId])
+  @@map("schedules")
+}
+
+model Goal {
+  id                 String         @id @default(cuid())
+  tenantId           String         @map("tenant_id")
+  name               String
+  periodType         GoalPeriodType @map("period_type")
+  parentId           String?        @map("parent_id")
+  year               Int
+  month              Int?
+  week               Int?
+  day                Int?
+  targetConversions  Int            @map("target_conversions")
+  precoVenda         Decimal        @map("preco_venda") @db.Decimal(12, 2)
+  custoPorConversao  Decimal        @map("custo_por_conversao") @db.Decimal(12, 2)
+  createdAt          DateTime       @default(now()) @map("created_at")
+
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent             Goal?          @relation("GoalTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children           Goal[]         @relation("GoalTree")
+
+  @@index([tenantId])
+  @@index([parentId])
+  @@map("goals")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  title     String
+  body      String
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  action    String
+  entity    String
+  entityId  String   @map("entity_id")
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}

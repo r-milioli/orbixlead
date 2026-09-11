@@ -1,0 +1,20 @@
+{
+  "name": "orbixlead",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @orbixlead/api --filter @orbixlead/web --filter @orbixlead/scraper run dev",
+    "dev:api": "pnpm --filter @orbixlead/api dev",
+    "dev:web": "pnpm --filter @orbixlead/web dev",
+    "dev:scraper": "pnpm --filter @orbixlead/scraper dev",
+    "build": "pnpm -r run build",
+    "db:generate": "pnpm --filter @orbixlead/api prisma:generate",
+    "db:migrate": "pnpm --filter @orbixlead/api prisma:migrate",
+    "db:seed": "pnpm --filter @orbixlead/api prisma:seed",
+    "db:setup": "pnpm db:generate && pnpm db:migrate && pnpm db:seed"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,4 +1,4 @@
-# Design System — LeadFlow CRM
+# Design System — Orbixlead CRM
 
 **Versão:** 1.0  
 **Status:** Base visual e funcional para implementação do MVP  
@@ -11,7 +11,7 @@
 
 # 1. Princípios do Design
 
-O LeadFlow CRM deve transmitir:
+O Orbixlead CRM deve transmitir:
 
 - Clareza
 - Velocidade
@@ -1742,7 +1742,7 @@ abre:
 
 ```text
 ┌──────────────────────┐
-│ LeadFlow CRM      X  │
+│ Orbixlead CRM      X  │
 │                      │
 │ Dashboard            │
 │ Capturar Leads       │
@@ -2537,6 +2537,6 @@ Nenhuma nova tela ou componente deverá ser criado fora deste sistema sem primei
 7. Se o ícone pertence ao Lucide.
 8. Se todos os estados foram definidos.
 9. Se a interação funciona em desktop e mobile.
-10. Se a solução mantém a mesma linguagem visual do restante do LeadFlow CRM.
+10. Se a solução mantém a mesma linguagem visual do restante do Orbixlead CRM.
 
 **Objetivo:** qualquer página nova deve parecer parte do mesmo produto, independentemente de quem a implementou.

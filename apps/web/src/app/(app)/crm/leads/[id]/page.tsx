@@ -1,0 +1,356 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import {
+  Anchor,
+  Button,
+  Card,
+  Divider,
+  Group,
+  Loader,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
+  Center,
+} from "@mantine/core";
+import { DateTimePicker } from "@mantine/dates";
+import { notifications } from "@mantine/notifications";
+import { ArrowLeft, MessageCircle, Phone, Trash2 } from "lucide-react";
+import dayjs from "dayjs";
+import { TemperatureBadge } from "@/components/common/TemperatureBadge";
+import { ConfirmModal } from "@/components/common/ConfirmModal";
+import { WhatsAppModal } from "@/components/crm/WhatsAppModal";
+import { useAuth } from "@/lib/auth";
+import { api, ApiError } from "@/lib/api";
+import type { Lead, PipelineStage, ScheduleItem } from "@/lib/types";
+import { unwrapList, unwrapOne } from "@/lib/unwrap";
+import { colors } from "@/theme/tokens";
+
+export default function LeadDetailPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { isAdmin } = useAuth();
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [stages, setStages] = useState<PipelineStage[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [waOpen, setWaOpen] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+  const [reason, setReason] = useState("");
+  const [scheduleNotes, setScheduleNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [leadPayload, stageData] = await Promise.all([
+        api(`/api/v1/leads/${params.id}`),
+        api("/api/v1/stages"),
+      ]);
+      const leadData = unwrapOne<Lead & { schedules?: ScheduleItem[] }>(leadPayload, "lead");
+      setLead(leadData);
+      setNotes(leadData.notes || "");
+      setStages(unwrapList<PipelineStage>(stageData, "stages"));
+      setSchedules(leadData.schedules ?? []);
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Lead não encontrado.",
+      });
+      router.push("/crm");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [params.id]);
+
+  const moveStage = async (stageId: string | null) => {
+    if (!lead || !stageId) return;
+    try {
+      await api(`/api/v1/leads/${lead.id}/move`, {
+        method: "PATCH",
+        body: { stageId },
+      });
+      setLead({ ...lead, stageId });
+      notifications.show({ color: "green", title: "Estágio atualizado", message: "" });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao mover.",
+      });
+    }
+  };
+
+  const saveNotes = async () => {
+    if (!lead) return;
+    setSaving(true);
+    try {
+      const updatedPayload = await api(`/api/v1/leads/${lead.id}`, {
+        method: "PATCH",
+        body: { notes },
+      });
+      setLead(unwrapOne<Lead>(updatedPayload, "lead"));
+      notifications.show({ color: "green", title: "Anotações salvas", message: "" });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao salvar.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createSchedule = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!lead || !scheduledAt || !reason.trim()) return;
+    setSaving(true);
+    try {
+      await api("/api/v1/schedules", {
+        method: "POST",
+        body: {
+          leadId: lead.id,
+          scheduledAt: scheduledAt.toISOString(),
+          reason: reason.trim(),
+          notes: scheduleNotes.trim() || undefined,
+        },
+      });
+      setReason("");
+      setScheduleNotes("");
+      setScheduledAt(null);
+      notifications.show({ color: "green", title: "Agendamento criado", message: "" });
+      await load();
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao agendar.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const softDelete = async () => {
+    if (!lead || !isAdmin) return;
+    setDeleting(true);
+    try {
+      await api(`/api/v1/leads/${lead.id}`, { method: "DELETE" });
+      notifications.show({ color: "green", title: "Lead excluído", message: "" });
+      setConfirmDeleteOpen(false);
+      router.push("/crm");
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao excluir.",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (loading || !lead) {
+    return (
+      <Center mih={320}>
+        <Loader color="orbix" />
+      </Center>
+    );
+  }
+
+  const socialList = Array.isArray(lead.socialUrls)
+    ? lead.socialUrls
+    : lead.socialUrls
+      ? Object.values(lead.socialUrls)
+      : [];
+
+  return (
+    <>
+      <Anchor component={Link} href="/crm" size="sm" c={colors.textSecondary} mb="md">
+        <Group gap={6}>
+          <ArrowLeft size={16} />
+          Voltar ao CRM
+        </Group>
+      </Anchor>
+
+      <Group justify="space-between" align="flex-start" mb="xl" wrap="wrap">
+        <div>
+          <Title order={2} mb={8}>
+            {lead.companyName}
+          </Title>
+          <Group gap="sm">
+            <TemperatureBadge value={lead.temperature} />
+            <Text size="sm" c={colors.textMuted}>
+              {lead.city || "—"}
+              {lead.segment ? ` · ${lead.segment}` : ""}
+            </Text>
+          </Group>
+        </div>
+        <Group>
+          <Button
+            variant="default"
+            leftSection={<Phone size={16} />}
+            component="a"
+            href={`tel:${lead.phoneE164}`}
+          >
+            Ligar
+          </Button>
+          <Button leftSection={<MessageCircle size={16} />} onClick={() => setWaOpen(true)}>
+            WhatsApp
+          </Button>
+          {isAdmin ? (
+            <Button
+              color="red"
+              variant="light"
+              leftSection={<Trash2 size={16} />}
+              onClick={() => setConfirmDeleteOpen(true)}
+            >
+              Excluir
+            </Button>
+          ) : null}
+        </Group>
+      </Group>
+
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+        <Card padding="lg">
+          <Title order={4} mb="md">
+            Informações
+          </Title>
+          <Stack gap="sm">
+            <Select
+              label="Estágio"
+              data={stages.map((s) => ({ value: s.id, label: s.label }))}
+              value={lead.stageId}
+              onChange={(v) => void moveStage(v)}
+            />
+            <TextInput label="Telefone" value={lead.phoneE164} readOnly />
+            <TextInput label="Cidade" value={lead.city || ""} readOnly />
+            <TextInput label="Endereço" value={lead.address || ""} readOnly />
+            <TextInput label="Site" value={lead.website || "Sem site"} readOnly />
+            <div>
+              <Text size="sm" fw={600} mb={4}>
+                Redes sociais
+              </Text>
+              {socialList.length === 0 ? (
+                <Text size="sm" c={colors.textMuted}>
+                  Nenhuma
+                </Text>
+              ) : (
+                socialList.map((url) => (
+                  <Text key={String(url)} size="sm" component="a" href={String(url)} target="_blank">
+                    {String(url)}
+                  </Text>
+                ))
+              )}
+            </div>
+            <Divider my="xs" />
+            <Textarea
+              label="Anotações"
+              minRows={4}
+              value={notes}
+              onChange={(e) => setNotes(e.currentTarget.value)}
+            />
+            <Button onClick={() => void saveNotes()} loading={saving} w="fit-content">
+              Salvar anotações
+            </Button>
+          </Stack>
+        </Card>
+
+        <Card padding="lg">
+          <Title order={4} mb="md">
+            Agendamento
+          </Title>
+          <form onSubmit={createSchedule}>
+            <Stack gap="sm">
+              <DateTimePicker
+                label="Data e hora"
+                value={scheduledAt}
+                onChange={(v) => {
+                  if (!v) {
+                    setScheduledAt(null);
+                    return;
+                  }
+                  setScheduledAt(v instanceof Date ? v : new Date(String(v)));
+                }}
+                locale="pt-br"
+                valueFormat="DD/MM/YYYY HH:mm"
+              />
+              <TextInput
+                label="Motivo"
+                required
+                value={reason}
+                onChange={(e) => setReason(e.currentTarget.value)}
+              />
+              <Textarea
+                label="Anotações"
+                minRows={3}
+                value={scheduleNotes}
+                onChange={(e) => setScheduleNotes(e.currentTarget.value)}
+              />
+              <Button type="submit" loading={saving}>
+                Agendar retorno
+              </Button>
+            </Stack>
+          </form>
+
+          <Divider my="lg" />
+          <Title order={5} mb="sm">
+            Próximos agendamentos
+          </Title>
+          {schedules.length === 0 ? (
+            <Text size="sm" c={colors.textMuted}>
+              Nenhum agendamento para este lead.
+            </Text>
+          ) : (
+            <Stack gap="sm">
+              {schedules.map((s) => (
+                <Card key={s.id} padding="sm" withBorder shadow="none">
+                  <Text size="sm" fw={600}>
+                    {dayjs(s.scheduledAt).format("DD/MM/YYYY HH:mm")}
+                  </Text>
+                  <Text size="sm">{s.reason}</Text>
+                  {s.notes ? (
+                    <Text size="xs" c={colors.textMuted}>
+                      {s.notes}
+                    </Text>
+                  ) : null}
+                </Card>
+              ))}
+            </Stack>
+          )}
+        </Card>
+      </SimpleGrid>
+
+      <WhatsAppModal
+        opened={waOpen}
+        onClose={() => setWaOpen(false)}
+        phoneE164={lead.phoneE164}
+        companyName={lead.companyName}
+      />
+
+      <ConfirmModal
+        opened={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={softDelete}
+        loading={deleting}
+        title="Excluir lead"
+        message={`Tem certeza que deseja excluir "${lead.companyName}"? O lead será removido do CRM e a ação será registrada.`}
+      />
+    </>
+  );
+}

@@ -1,0 +1,4 @@
+# This file is used by Prisma Migrate. Do not edit manually.
+# Prisma schema version synced with apps/api/prisma/schema.prisma
+
+provider = "postgresql"

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LeadFlow CRM — Design System</title>
+<title>Orbixlead CRM — Design System</title>
 <style>
 :root{
   color-scheme:light;
@@ -124,7 +124,7 @@ a{color:var(--primary-dark);text-decoration:none}
 <body>
 <div class="app">
   <aside class="sidebar" id="sidebar">
-    <div class="brand"><div class="brand-mark">L</div><span class="brand-name">LeadFlow CRM</span></div>
+    <div class="brand"><div class="brand-mark">L</div><span class="brand-name">Orbixlead CRM</span></div>
     <nav class="nav">
       <div class="nav-section">Principal</div>
       <button class="nav-item active" data-view="dashboard"><i data-lucide="layout-dashboard" class="icon"></i><span class="nav-label">Dashboard</span></button>
@@ -150,7 +150,7 @@ a{color:var(--primary-dark);text-decoration:none}
     <header class="topbar">
       <div class="top-left">
         <button class="menu-btn" id="menuBtn" aria-label="Abrir menu"><i data-lucide="menu"></i></button>
-        <div><div class="crumb">LeadFlow CRM / <span id="crumbText">Dashboard</span></div><div class="page-title" id="topTitle">Dashboard</div></div>
+        <div><div class="crumb">Orbixlead CRM / <span id="crumbText">Dashboard</span></div><div class="page-title" id="topTitle">Dashboard</div></div>
       </div>
       <div class="top-actions">
         <div class="dropdown">
@@ -367,7 +367,7 @@ a{color:var(--primary-dark);text-decoration:none}
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 
-const THEME_KEY='leadflow-theme';
+const THEME_KEY='Orbixlead-theme';
 function getSystemTheme(){return window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
 function applyTheme(mode, persist=true){
   const resolved=mode==='system'?getSystemTheme():mode;
@@ -389,7 +389,7 @@ function activateView(view){
   const target=document.getElementById(view); if(target) target.classList.add('active');
   $$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
   const names={dashboard:'Dashboard',capture:'Capturar Leads',leads:'Leads Capturados',crm:'Pipeline',messages:'Mensagens',goals:'Metas',settings:'Configurações'};
-  $('#topTitle').textContent=names[view]||'LeadFlow CRM'; $('#crumbText').textContent=names[view]||'';
+  $('#topTitle').textContent=names[view]||'Orbixlead CRM'; $('#crumbText').textContent=names[view]||'';
   $('#userPanel')?.classList.remove('show');
   if(innerWidth<=760) $('#sidebar').classList.remove('mobile-open');
 }

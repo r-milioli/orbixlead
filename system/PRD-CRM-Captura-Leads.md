@@ -1,5 +1,5 @@
 # PRD — Sistema de CRM de Captura de Leads
-*(nome provisório: **LeadFlow CRM** — ajustar quando definir a marca)*
+*(nome provisório: **Orbixlead CRM** — ajustar quando definir a marca)*
 
 Versão: 1.0 · Status: MVP em especificação
 
