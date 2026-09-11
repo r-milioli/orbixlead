@@ -16,7 +16,7 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
-import { Plus, SlidersHorizontal } from "lucide-react";
+import { ArchiveRestore, Plus, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { KanbanBoard } from "@/components/crm/KanbanBoard";
@@ -53,10 +53,15 @@ export default function CrmPage() {
   const [loading, setLoading] = useState(true);
   const [filtersOpen, { open: openFilters, close: closeFilters }] = useDisclosure(false);
   const [stageModalOpen, { open: openStageModal, close: closeStageModal }] = useDisclosure(false);
+  const [archivedModalOpen, { open: openArchivedModal, close: closeArchivedModal }] =
+    useDisclosure(false);
   const [draftFilters, setDraftFilters] = useState<AdvancedFilters>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<AdvancedFilters>(DEFAULT_FILTERS);
   const [newStageLabel, setNewStageLabel] = useState("");
   const [creatingStage, setCreatingStage] = useState(false);
+  const [archivedStages, setArchivedStages] = useState<PipelineStage[]>([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const [renameStage, setRenameStage] = useState<PipelineStage | null>(null);
   const [renameLabel, setRenameLabel] = useState("");
@@ -297,6 +302,52 @@ export default function CrmPage() {
     }
   };
 
+  const loadArchivedStages = async () => {
+    setLoadingArchived(true);
+    try {
+      const data = await api("/api/v1/stages?includeArchived=1");
+      const all = unwrapList<PipelineStage>(data, "stages");
+      setArchivedStages(all.filter((s) => Boolean(s.archivedAt)));
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao carregar arquivados.",
+      });
+    } finally {
+      setLoadingArchived(false);
+    }
+  };
+
+  const openArchivedStages = () => {
+    openArchivedModal();
+    void loadArchivedStages();
+  };
+
+  const restoreStage = async (stage: PipelineStage) => {
+    setRestoringId(stage.id);
+    try {
+      await api(`/api/v1/stages/${stage.id}`, {
+        method: "PATCH",
+        body: { archived: false },
+      });
+      notifications.show({
+        color: "green",
+        title: "Estágio restaurado",
+        message: `“${stage.label}” voltou ao final do pipeline e ao funil do dashboard.`,
+      });
+      await Promise.all([load(), loadArchivedStages()]);
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao desarquivar estágio.",
+      });
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
   const activeFilterCount =
     appliedFilters.temperatures.length +
     (appliedFilters.city ? 1 : 0) +
@@ -324,12 +375,21 @@ export default function CrmPage() {
               {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
             </Button>
             {isAdmin ? (
-              <Button
-                leftSection={<Plus size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                onClick={openStageModal}
-              >
-                Novo estágio
-              </Button>
+              <>
+                <Button
+                  variant="default"
+                  leftSection={<ArchiveRestore size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                  onClick={openArchivedStages}
+                >
+                  Arquivados
+                </Button>
+                <Button
+                  leftSection={<Plus size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                  onClick={openStageModal}
+                >
+                  Novo estágio
+                </Button>
+              </>
             ) : null}
           </Group>
         }
@@ -492,6 +552,55 @@ export default function CrmPage() {
               onClick={() => void createStage()}
             >
               Criar estágio
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={archivedModalOpen}
+        onClose={closeArchivedModal}
+        title="Estágios arquivados"
+        centered
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Restaurar uma coluna traz ela de volta ao pipeline e ao funil do dashboard.
+          </Text>
+          {loadingArchived ? (
+            <Center py="lg">
+              <Loader color="orbix" size="sm" />
+            </Center>
+          ) : archivedStages.length === 0 ? (
+            <Text size="sm">Nenhum estágio arquivado no momento.</Text>
+          ) : (
+            <Stack gap="sm">
+              {archivedStages.map((stage) => (
+                <Group key={stage.id} justify="space-between" wrap="nowrap">
+                  <div style={{ minWidth: 0 }}>
+                    <Text size="sm" fw={600} lineClamp={1}>
+                      {stage.label}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {stage.slug}
+                    </Text>
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    loading={restoringId === stage.id}
+                    onClick={() => void restoreStage(stage)}
+                  >
+                    Desarquivar
+                  </Button>
+                </Group>
+              ))}
+            </Stack>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeArchivedModal}>
+              Fechar
             </Button>
           </Group>
         </Stack>
