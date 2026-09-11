@@ -236,11 +236,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [collapsed, { toggle: toggleCollapsed }] = useDisclosure(false);
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false);
-  const isMobile = useMediaQuery("(max-width: 768px)", false, {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
     getInitialValueInEffect: true,
   });
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isMobile || !mobileOpened) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMobile();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isMobile, mobileOpened, closeMobile]);
 
   const role = user?.role;
   const canCapture = role === "admin" || user?.canCapture !== false;
@@ -467,40 +481,49 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Box
           component="header"
           style={{
-            height: layout.topbarHeight,
+            height: isMobile ? layout.topbarHeightMobile : layout.topbarHeight,
             background: colors.surface,
             borderBottom: `1px solid ${colors.borderLight}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 20px",
+            gap: isMobile ? 8 : 12,
+            padding: isMobile ? "0 12px" : "0 20px",
             position: "sticky",
             top: 0,
             zIndex: 50,
+            minWidth: 0,
           }}
         >
-          <Group gap="sm">
+          <Group gap={isMobile ? "xs" : "sm"} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
             {isMobile ? (
-              <Burger opened={mobileOpened} onClick={toggleMobile} size="sm" />
+              <Burger opened={mobileOpened} onClick={toggleMobile} size="sm" style={{ flexShrink: 0 }} />
             ) : null}
-            {tenant && user?.role !== "super_admin" ? (
+            {/* No mobile os créditos ficam só na sidebar (drawer) para liberar espaço no header */}
+            {!isMobile && tenant && user?.role !== "super_admin" ? (
               <CreditsDisplay
                 remaining={tenant.creditRemaining}
                 cap={tenant.creditCap}
                 unlimited={tenant.unlimited}
                 compact
               />
-            ) : (
+            ) : null}
+            {!isMobile && (!tenant || user?.role === "super_admin") ? (
               <Text size="sm" c={colors.textMuted}>
                 Plataforma
               </Text>
-            )}
+            ) : null}
+            {isMobile ? <BrandLogo size={28} showWordmark={false} /> : null}
           </Group>
 
-          <Group gap="sm" style={{ overflow: "visible" }}>
+          <Group gap={isMobile ? 4 : "sm"} wrap="nowrap" style={{ overflow: "visible", flexShrink: 0 }}>
             <ColorSchemeToggle />
             {user?.role !== "super_admin" ? (
-              <Menu width={320} position="bottom-end" withinPortal>
+              <Menu
+                width={isMobile ? "calc(100vw - 16px)" : 320}
+                position="bottom-end"
+                withinPortal
+              >
                 <Menu.Target>
                   <Indicator
                     disabled={unread === 0}
@@ -585,11 +608,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Menu>
             ) : null}
 
-            <Menu width={220} position="bottom-end" withinPortal>
+            <Menu
+              width={isMobile ? "calc(100vw - 16px)" : 220}
+              position="bottom-end"
+              withinPortal
+            >
               <Menu.Target>
-                <UnstyledButton>
-                  <Group gap={8}>
-                    <Avatar radius="xl" size={32} color="orbix">
+                <UnstyledButton aria-label="Menu do usuário">
+                  <Group gap={8} wrap="nowrap">
+                    <Avatar radius="xl" size={isMobile ? 28 : 32} color="orbix">
                       {(user?.name || user?.email || "?").slice(0, 1).toUpperCase()}
                     </Avatar>
                     {!isMobile ? (
@@ -634,7 +661,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Group>
         </Box>
 
-        <Box component="main" p={{ base: "md", md: "xl" }} style={{ flex: 1 }}>
+        <Box
+          component="main"
+          p={{ base: "sm", sm: "md", md: "xl" }}
+          style={{ flex: 1, minWidth: 0, width: "100%" }}
+        >
           {children}
         </Box>
       </Box>

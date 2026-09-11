@@ -100,6 +100,9 @@ export const layout = {
   sidebarExpanded: 248,
   sidebarCollapsed: 72,
   topbarHeight: 64,
+  topbarHeightMobile: 56,
+  /** max-width em px — alinhado ao useMediaQuery do AppShell */
+  mobileBreakpoint: 768,
 } as const;
 
 export const ICON_STROKE = 1.5;

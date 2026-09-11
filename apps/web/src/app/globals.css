@@ -152,3 +152,20 @@ a {
   scrollbar-width: thin;
   scrollbar-color: var(--orbix-scrollbar) transparent;
 }
+
+/* Overrides com seletor — não cabem em styles{} do Mantine (inline styles) */
+.mantine-Select-option[data-checked] {
+  background-color: var(--orbix-primary-light);
+}
+
+.mantine-Accordion-control:hover {
+  background-color: var(--orbix-surface-hover);
+}
+
+.mantine-Menu-item:hover {
+  background-color: var(--orbix-surface-hover);
+}
+
+.mantine-Tabs-tab[data-active] {
+  color: var(--orbix-primary);
+}

@@ -111,11 +111,6 @@ export const theme = createTheme({
           backgroundColor: "var(--orbix-surface)",
           borderColor: "var(--orbix-border)",
         },
-        option: {
-          "&[data-checked]": {
-            backgroundColor: "var(--orbix-primary-light)",
-          },
-        },
       },
     },
     Textarea: {
@@ -180,9 +175,6 @@ export const theme = createTheme({
         control: {
           backgroundColor: "var(--orbix-surface)",
           color: "var(--orbix-text)",
-          "&:hover": {
-            backgroundColor: "var(--orbix-surface-hover)",
-          },
         },
         panel: {
           backgroundColor: "var(--orbix-surface-secondary)",
@@ -208,9 +200,6 @@ export const theme = createTheme({
         },
         item: {
           color: "var(--orbix-text)",
-          "&:hover": {
-            backgroundColor: "var(--orbix-surface-hover)",
-          },
         },
       },
     },
@@ -218,9 +207,6 @@ export const theme = createTheme({
       styles: {
         tab: {
           color: "var(--orbix-text-secondary)",
-          "&[data-active]": {
-            color: "var(--orbix-primary)",
-          },
         },
       },
     },
