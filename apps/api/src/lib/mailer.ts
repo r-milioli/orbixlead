@@ -35,13 +35,21 @@ export async function sendMail(payload: MailPayload): Promise<void> {
     return;
   }
 
-  await transporter.sendMail({
-    from: smtpFrom,
-    to: payload.to,
-    subject: payload.subject,
-    text: payload.text,
-    html: payload.html ?? `<pre>${payload.text}</pre>`,
-  });
+  try {
+    await transporter.sendMail({
+      from: smtpFrom,
+      to: payload.to,
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html ?? `<pre>${payload.text}</pre>`,
+    });
+  } catch (err) {
+    logger.error("email_failed", {
+      to: payload.to,
+      subject: payload.subject,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export function webUrl(path: string): string {

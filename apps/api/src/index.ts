@@ -10,6 +10,8 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import { ZodError } from "zod";
 import { logger } from "./lib/logger";
+import { bootstrapSuperAdminFromEnv } from "./lib/bootstrap-super-admin";
+import { assertRedis, redisTarget } from "./lib/redis";
 import { PrismaSessionStore } from "./lib/session-store";
 import apiRoutes from "./routes";
 
@@ -76,6 +78,23 @@ app.use(
   }
 );
 
-app.listen(port, () => {
-  logger.info("api_listening", { port, webOrigin });
+async function start() {
+  logger.info("redis_config", redisTarget());
+  try {
+    await assertRedis();
+  } catch (err) {
+    logger.error("redis_unavailable", {
+      message: err instanceof Error ? err.message : String(err),
+      ...redisTarget(),
+    });
+  }
+  await bootstrapSuperAdminFromEnv();
+  app.listen(port, () => {
+    logger.info("api_listening", { port, webOrigin });
+  });
+}
+
+start().catch((err) => {
+  logger.error("api_start_failed", { err });
+  process.exit(1);
 });

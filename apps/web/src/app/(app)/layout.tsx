@@ -8,14 +8,15 @@ import { useAuth } from "@/lib/auth";
 import { colors } from "@/theme/tokens";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, needsSetup } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/login");
+    if (loading) return;
+    if (!user) {
+      router.replace(needsSetup ? "/setup" : "/login");
     }
-  }, [loading, user, router]);
+  }, [loading, user, needsSetup, router]);
 
   if (loading || !user) {
     return (

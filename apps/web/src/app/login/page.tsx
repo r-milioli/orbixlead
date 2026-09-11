@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Anchor, Button, PasswordInput, Stack, TextInput } from "@mantine/core";
+import { Anchor, Button, Center, Loader, PasswordInput, Stack, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { AuthShell } from "@/components/common/AuthShell";
 import { useAuth } from "@/lib/auth";
@@ -10,16 +10,33 @@ import { ApiError } from "@/lib/api";
 import { colors } from "@/theme/tokens";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loading, needsSetup, user } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (needsSetup) {
+      router.replace("/setup");
+      return;
+    }
+    if (user) {
+      if (user.role === "super_admin") {
+        router.replace("/super-admin/tenants");
+      } else if (user.role === "operador") {
+        router.replace("/captura");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [loading, needsSetup, user, router]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     try {
       if (forgotMode) {
         const { api } = await import("@/lib/api");
@@ -49,9 +66,17 @@ export default function LoginPage() {
         err instanceof ApiError ? err.message : "Não foi possível entrar. Tente novamente.";
       notifications.show({ color: "red", title: "Erro", message });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
+
+  if (loading || needsSetup || user) {
+    return (
+      <Center mih="100vh" bg={colors.background}>
+        <Loader color="orbix" />
+      </Center>
+    );
+  }
 
   return (
     <AuthShell subtitle={forgotMode ? "Recuperar acesso" : "Entre na sua conta"}>
@@ -74,7 +99,7 @@ export default function LoginPage() {
               placeholder="Sua senha"
             />
           ) : null}
-          <Button type="submit" fullWidth loading={loading}>
+          <Button type="submit" fullWidth loading={submitting}>
             {forgotMode ? "Enviar link" : "Entrar"}
           </Button>
         </Stack>

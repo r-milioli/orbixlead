@@ -1,7 +1,9 @@
 import { Queue } from "bullmq";
 import { redis } from "./redis";
+import { logger } from "./logger";
 
 export const SCRAPING_QUEUE = "scraping";
+const ENQUEUE_TIMEOUT_MS = 10_000;
 
 export type ScrapingJobPayload = {
   jobId: string;
@@ -23,7 +25,28 @@ export const scrapingQueue = new Queue<ScrapingJobPayload>(SCRAPING_QUEUE, {
 });
 
 export async function enqueueScrapingJob(payload: ScrapingJobPayload) {
-  return scrapingQueue.add("scrape", payload, { jobId: payload.jobId });
+  logger.info("scraping_enqueue_start", {
+    jobId: payload.jobId,
+    city: payload.city,
+    segment: payload.segment,
+    quantity: payload.quantity,
+  });
+
+  const added = await Promise.race([
+    scrapingQueue.add("scrape", payload, { jobId: payload.jobId }),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Timeout ao enfileirar no Redis (${ENQUEUE_TIMEOUT_MS}ms)`));
+      }, ENQUEUE_TIMEOUT_MS);
+    }),
+  ]);
+
+  logger.info("scraping_enqueued", {
+    jobId: payload.jobId,
+    bullJobId: added.id,
+    queue: SCRAPING_QUEUE,
+  });
+  return added;
 }
 
 /** Remove job from BullMQ (waiting/delayed/active if possible). */
@@ -34,7 +57,6 @@ export async function removeScrapingJob(jobId: string): Promise<boolean> {
     await job.remove();
     return true;
   } catch {
-    // Active jobs may not remove cleanly; try discard
     try {
       await job.discard();
       return true;

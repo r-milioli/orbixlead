@@ -4,6 +4,7 @@ import { maxJobQuantity, normalizeCompanyName } from "@orbixlead/shared";
 import { JobStatus, Prisma, Role, Temperature } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { enqueueScrapingJob, removeScrapingJob } from "../lib/queue";
+import { logger } from "../lib/logger";
 import { asyncHandler } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
 import { releaseReservation, reserve } from "../services/credits";
@@ -197,14 +198,38 @@ router.post(
       });
     }
 
-    await enqueueScrapingJob({
-      jobId: job.id,
-      tenantId: tenant.id,
-      country: body.country,
-      city: body.city,
-      segment: body.segment,
-      quantity: body.quantity,
-    });
+    try {
+      await enqueueScrapingJob({
+        jobId: job.id,
+        tenantId: tenant.id,
+        country: body.country,
+        city: body.city,
+        segment: body.segment,
+        quantity: body.quantity,
+      });
+    } catch (err) {
+      logger.error("scraping_enqueue_failed", {
+        jobId: job.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      await releaseReservation({
+        tenantId: tenant.id,
+        amount: body.quantity,
+        jobId: job.id,
+        createdById: req.user!.id,
+        note: `Release — falha ao enfileirar ${job.id}`,
+      });
+      await prisma.scrapingJob.update({
+        where: { id: job.id },
+        data: {
+          status: JobStatus.FAILED,
+          errorMessage: "Falha ao enfileirar no Redis",
+        },
+      });
+      return res.status(503).json({
+        error: "Não foi possível colocar a captura na fila. Verifique o REDIS_URL da API.",
+      });
+    }
 
     return res.status(201).json({ job: serializeJob(job) });
   })

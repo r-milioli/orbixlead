@@ -1,5 +1,5 @@
-# Playwright image already includes browser deps + Chromium.
-# Keep tag in sync with the playwright version in package.json.
+# Playwright já inclui Chromium e as dependências do sistema.
+# Manter a tag alinhada com a versão do playwright em package.json.
 FROM mcr.microsoft.com/playwright:v1.51.0-noble
 
 ENV PNPM_HOME="/pnpm"
@@ -12,11 +12,11 @@ RUN corepack enable && corepack prepare pnpm@11.22.0 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/scraper/package.json ./apps/scraper/
 
-RUN pnpm install --filter @orbixlead/scraper... --frozen-lockfile=false
+RUN pnpm install --filter @orbixlead/scraper... --frozen-lockfile
 
 COPY packages/shared ./packages/shared
 COPY apps/scraper ./apps/scraper
@@ -26,5 +26,5 @@ RUN pnpm --filter @orbixlead/shared build \
 
 WORKDIR /app/apps/scraper
 
-# concurrency=1 is enforced in code; one container = one worker process
+# concurrency=1 no código; um container = um worker
 CMD ["node", "dist/index.js"]

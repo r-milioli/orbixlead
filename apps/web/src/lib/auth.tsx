@@ -43,8 +43,10 @@ type AuthContextValue = {
   user: AuthUser | null;
   tenant: TenantCredits | null;
   loading: boolean;
+  needsSetup: boolean;
   refresh: () => Promise<void>;
   login: (email: string, password: string) => Promise<MeResponse>;
+  setup: (input: { name: string; email: string; password: string }) => Promise<MeResponse>;
   logout: () => Promise<void>;
   isSuperAdmin: boolean;
   isAdmin: boolean;
@@ -87,9 +89,17 @@ function normalizeMe(data: MeResponse): MeResponse {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [tenant, setTenant] = useState<TenantCredits | null>(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    try {
+      const status = await api<{ needsSetup: boolean }>("/api/v1/auth/setup-status");
+      setNeedsSetup(Boolean(status.needsSetup));
+    } catch {
+      setNeedsSetup(false);
+    }
+
     try {
       const data = normalizeMe(await api<MeResponse>("/api/v1/auth/me"));
       setUser(data.user);
@@ -119,6 +129,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = normalizeMe(await api<MeResponse>("/api/v1/auth/me"));
     setUser(data.user);
     setTenant(data.tenant);
+    setNeedsSetup(false);
+    return data;
+  }, []);
+
+  const setup = useCallback(async (input: { name: string; email: string; password: string }) => {
+    await api("/api/v1/auth/setup", {
+      method: "POST",
+      body: input,
+    });
+    const data = normalizeMe(await api<MeResponse>("/api/v1/auth/me"));
+    setUser(data.user);
+    setTenant(data.tenant);
+    setNeedsSetup(false);
     return data;
   }, []);
 
@@ -137,8 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       tenant,
       loading,
+      needsSetup,
       refresh,
       login,
+      setup,
       logout,
       isSuperAdmin: role === "super_admin",
       isAdmin: role === "admin",
@@ -146,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canAccess: (roles) => (role ? roles.includes(role) : false),
       setTenant,
     };
-  }, [user, tenant, loading, refresh, login, logout]);
+  }, [user, tenant, loading, needsSetup, refresh, login, setup, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -7,8 +7,44 @@ import { prisma } from "../lib/prisma";
 import { sendMail, webUrl } from "../lib/mailer";
 import { asyncHandler, serializeUser } from "../lib/serialize";
 import { AuthedRequest, mePayload, requireAuth } from "../middleware/auth";
+import {
+  createFirstSuperAdmin,
+  hasSuperAdmin,
+  SuperAdminSetupError,
+} from "../lib/bootstrap-super-admin";
 
 const router = Router();
+
+router.get(
+  "/setup-status",
+  asyncHandler(async (_req, res) => {
+    return res.json({ needsSetup: !(await hasSuperAdmin()) });
+  })
+);
+
+router.post(
+  "/setup",
+  asyncHandler(async (req, res) => {
+    const body = z
+      .object({
+        name: z.string().min(2).max(80),
+        email: z.string().email(),
+        password: z.string().min(8),
+      })
+      .parse(req.body);
+
+    try {
+      const user = await createFirstSuperAdmin(body);
+      req.session.userId = user.id;
+      return res.status(201).json({ user: serializeUser(user) });
+    } catch (err) {
+      if (err instanceof SuperAdminSetupError) {
+        return res.status(err.status).json({ error: err.message });
+      }
+      throw err;
+    }
+  })
+);
 
 router.post(
   "/login",

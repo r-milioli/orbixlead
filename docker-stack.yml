@@ -1,0 +1,131 @@
+# Stack Swarm de produção — sem Postgres, Redis ou Traefik (já existentes na VPS).
+# Rede: overlay externa network_public
+# Imagens: automacaodebaixocusto/orbixlead:{web,api,scraper}
+#
+# Preencha DATABASE_URL, REDIS_URL, SESSION_SECRET, INTERNAL_API_KEY e SMTP_*.
+# Super admin: preencha SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD na api,
+# ou deixe vazio e crie pela tela /setup no primeiro acesso.
+# Se o Postgres responde como serviço Docker `postgres` (veja o log do Prisma),
+# o Redis provavelmente é `redis://redis:6379` na mesma rede — não host.docker.internal.
+# API e scraper DEVEM usar o mesmo REDIS_URL.
+#
+#   docker stack deploy -c docker-stack.yml orbixlead
+
+version: "3.8"
+
+services:
+  web:
+    image: automacaodebaixocusto/orbixlead:web
+    networks:
+      - network_public
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:4000
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=network_public
+        - traefik.http.routers.orbixlead.rule=Host(`orbixlead.automacaodebaixocusto.com.br`)
+        - traefik.http.routers.orbixlead.entrypoints=websecure
+        - traefik.http.routers.orbixlead.tls=true
+        - traefik.http.routers.orbixlead.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.orbixlead.priority=1
+        - traefik.http.services.orbixlead-service.loadbalancer.server.port=3000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  api:
+    image: automacaodebaixocusto/orbixlead:api
+    networks:
+      - network_public
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NODE_ENV: production
+      API_PORT: "4000"
+      DATABASE_URL: postgresql://orbixlead:ALTERE_A_SENHA@postgres:5432/orbixlead?schema=public
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: altere-para-um-segredo-aleatorio-com-no-minimo-32-chars
+      WEB_ORIGIN: https://orbixlead.automacaodebaixocusto.com.br
+      COOKIE_SECURE: "true"
+      INTERNAL_API_KEY: altere-esta-chave-interna
+      # Opcional: preencha os dois para criar o super admin na primeira subida.
+      # Se deixar vazio, o primeiro acesso abre https://.../setup
+      SUPER_ADMIN_EMAIL: ""
+      SUPER_ADMIN_PASSWORD: ""
+      SUPER_ADMIN_NAME: Super Admin
+      SMTP_HOST: smtp-relay.brevo.com
+      SMTP_PORT: "587"
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      SMTP_FROM: Orbixlead <noreply@automacaodebaixocusto.com.br>
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=network_public
+        - traefik.http.routers.orbixlead-api.rule=Host(`orbixlead.automacaodebaixocusto.com.br`) && PathPrefix(`/api`)
+        - traefik.http.routers.orbixlead-api.entrypoints=websecure
+        - traefik.http.routers.orbixlead-api.tls=true
+        - traefik.http.routers.orbixlead-api.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.orbixlead-api.priority=100
+        - traefik.http.services.orbixlead-api-service.loadbalancer.server.port=4000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  scraper:
+    image: automacaodebaixocusto/orbixlead:scraper
+    networks:
+      - network_public
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://orbixlead:ALTERE_A_SENHA@postgres:5432/orbixlead?schema=public
+      REDIS_URL: redis://redis:6379
+      API_URL: http://api:4000
+      SCRAPER_MODE: playwright
+      INTERNAL_API_KEY: altere-esta-chave-interna
+    stop_grace_period: 60s
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+networks:
+  network_public:
+    external: true
