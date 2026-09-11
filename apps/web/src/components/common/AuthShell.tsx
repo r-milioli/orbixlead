@@ -1,8 +1,8 @@
 "use client";
 
 import { ReactNode } from "react";
-import Image from "next/image";
-import { Group, Paper, Stack, Text, Title } from "@mantine/core";
+import { Paper, Stack, Text } from "@mantine/core";
+import { BrandLogo } from "@/components/common/BrandLogo";
 import { colors } from "@/theme/tokens";
 
 type AuthShellProps = {
@@ -25,18 +25,8 @@ export function AuthShell({ subtitle, children, footer }: AuthShellProps) {
       <Paper w="100%" maw={420} p="xl" withBorder radius="md" shadow="sm">
         <Stack gap="lg">
           <div>
-            <Group gap={10} mb={8}>
-              <Image src="/logo.png" alt="Orbixlead" width={44} height={44} priority />
-              <Title order={2} style={{ letterSpacing: "-0.02em" }}>
-                <Text span c={colors.primary} inherit>
-                  Orbix
-                </Text>
-                <Text span c={colors.textPrimary} inherit>
-                  lead
-                </Text>
-              </Title>
-            </Group>
-            <Text size="sm" c={colors.textSecondary}>
+            <BrandLogo size={44} wordmarkAs="title" priority />
+            <Text size="sm" c={colors.textSecondary} mt={8}>
               {subtitle}
             </Text>
           </div>

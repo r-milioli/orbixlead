@@ -2,6 +2,29 @@ export type Role = "super_admin" | "admin" | "operador";
 
 export type Temperature = "frio" | "morno" | "quente";
 
+export type LeadCardMarker =
+  | "none"
+  | "urgent"
+  | "closing"
+  | "waiting"
+  | "missing"
+  | "follow_up";
+
+export const LEAD_CARD_MARKERS: {
+  value: LeadCardMarker;
+  label: string;
+  description: string;
+}[] = [
+  { value: "none", label: "Padrão", description: "Sem destaque visual" },
+  { value: "urgent", label: "Urgente", description: "Atendimento prioritário" },
+  { value: "closing", label: "Prestes a fechar", description: "Alta chance de conversão" },
+  { value: "waiting", label: "Aguardando", description: "Esperando retorno do lead" },
+  { value: "missing", label: "Falta informação", description: "Dados incompletos ou pendências" },
+  { value: "follow_up", label: "Follow-up", description: "Retomar contato em breve" },
+];
+
+export const LEAD_CARD_MARKER_VALUES = LEAD_CARD_MARKERS.map((m) => m.value);
+
 export type PipelineSlug =
   | "new"
   | "contacted"

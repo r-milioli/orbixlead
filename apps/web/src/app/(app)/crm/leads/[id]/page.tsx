@@ -7,6 +7,7 @@ import {
   ActionIcon,
   Anchor,
   Badge,
+  Box,
   Button,
   Card,
   Center,
@@ -31,9 +32,15 @@ import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { WhatsAppModal } from "@/components/crm/WhatsAppModal";
 import { useAuth } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
+import {
+  LEAD_CARD_MARKERS,
+  cardMarkerStyle,
+  normalizeCardMarker,
+} from "@/lib/cardMarkers";
 import type { Lead, PipelineStage, ScheduleItem } from "@/lib/types";
 import { unwrapList, unwrapOne } from "@/lib/unwrap";
 import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import type { LeadCardMarker } from "@orbixlead/shared";
 
 function websiteHref(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
@@ -226,6 +233,26 @@ export default function LeadDetailPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveCardMarker = async (cardMarker: LeadCardMarker) => {
+    if (!lead) return;
+    const previous = lead;
+    setLead({ ...lead, cardMarker });
+    try {
+      const updatedPayload = await api(`/api/v1/leads/${lead.id}`, {
+        method: "PATCH",
+        body: { cardMarker },
+      });
+      setLead(unwrapOne<Lead>(updatedPayload, "lead"));
+    } catch (err) {
+      setLead(previous);
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao atualizar destaque.",
+      });
     }
   };
 
@@ -568,6 +595,31 @@ export default function LeadDetailPage() {
               )}
             </div>
             <Divider my="xs" />
+            <Select
+              label="Destaque no pipeline"
+              description="Cor do card no Kanban para prioridade e status visual"
+              data={LEAD_CARD_MARKERS.map((m) => ({
+                value: m.value,
+                label: `${m.label} — ${m.description}`,
+              }))}
+              value={normalizeCardMarker(lead.cardMarker)}
+              onChange={(value) => {
+                if (value) void saveCardMarker(value as LeadCardMarker);
+              }}
+              allowDeselect={false}
+              leftSection={
+                <Box
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 999,
+                    ...cardMarkerStyle(lead.cardMarker),
+                    borderWidth: 2,
+                    borderStyle: "solid",
+                  }}
+                />
+              }
+            />
             <Textarea
               label="Anotações"
               minRows={4}

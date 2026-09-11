@@ -26,6 +26,7 @@ import type { Lead, PipelineStage } from "@/lib/types";
 import { normalizeTemperature } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
 import { ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import type { LeadCardMarker } from "@orbixlead/shared";
 
 type AdvancedFilters = {
   temperatures: ("frio" | "morno" | "quente")[];
@@ -56,6 +57,14 @@ export default function CrmPage() {
   const [appliedFilters, setAppliedFilters] = useState<AdvancedFilters>(DEFAULT_FILTERS);
   const [newStageLabel, setNewStageLabel] = useState("");
   const [creatingStage, setCreatingStage] = useState(false);
+
+  const [renameStage, setRenameStage] = useState<PipelineStage | null>(null);
+  const [renameLabel, setRenameLabel] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  const [archiveStage, setArchiveStage] = useState<PipelineStage | null>(null);
+  const [moveToStageId, setMoveToStageId] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,6 +126,10 @@ export default function CrmPage() {
     return grouped;
   }, [stages, filteredLeads]);
 
+  const archiveLeadTotal = archiveStage
+    ? allLeads.filter((l) => l.stageId === archiveStage.id).length
+    : 0;
+
   const onMove = async (leadId: string, stageId: string) => {
     const previous = allLeads;
     setAllLeads((prev) =>
@@ -133,6 +146,27 @@ export default function CrmPage() {
       notifications.show({
         color: "red",
         title: "Erro ao mover",
+        message: err instanceof ApiError ? err.message : "Tente novamente.",
+      });
+    }
+  };
+
+  const onCardMarkerChange = async (leadId: string, cardMarker: LeadCardMarker) => {
+    const previous = allLeads;
+    setAllLeads((prev) =>
+      prev.map((lead) => (lead.id === leadId ? { ...lead, cardMarker } : lead))
+    );
+
+    try {
+      await api(`/api/v1/leads/${leadId}`, {
+        method: "PATCH",
+        body: { cardMarker },
+      });
+    } catch (err) {
+      setAllLeads(previous);
+      notifications.show({
+        color: "red",
+        title: "Erro ao marcar",
         message: err instanceof ApiError ? err.message : "Tente novamente.",
       });
     }
@@ -169,7 +203,7 @@ export default function CrmPage() {
       notifications.show({
         color: "green",
         title: "Estágio criado",
-        message: "O novo estágio foi adicionado ao pipeline.",
+        message: "O novo estágio foi adicionado ao pipeline e ao funil do dashboard.",
       });
       setNewStageLabel("");
       closeStageModal();
@@ -182,6 +216,84 @@ export default function CrmPage() {
       });
     } finally {
       setCreatingStage(false);
+    }
+  };
+
+  const openRename = (stage: PipelineStage) => {
+    setRenameStage(stage);
+    setRenameLabel(stage.label);
+  };
+
+  const saveRename = async () => {
+    if (!renameStage || !renameLabel.trim()) return;
+    setRenaming(true);
+    try {
+      await api(`/api/v1/stages/${renameStage.id}`, {
+        method: "PATCH",
+        body: { label: renameLabel.trim() },
+      });
+      notifications.show({
+        color: "green",
+        title: "Estágio atualizado",
+        message: "O nome foi alterado no CRM e no funil do dashboard.",
+      });
+      setRenameStage(null);
+      await load();
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao renomear estágio.",
+      });
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const openArchive = (stage: PipelineStage) => {
+    setArchiveStage(stage);
+    const fallback = stages.find((s) => s.id !== stage.id && s.slug === "new")
+      ?? stages.find((s) => s.id !== stage.id)
+      ?? null;
+    setMoveToStageId(fallback?.id ?? null);
+  };
+
+  const confirmArchive = async () => {
+    if (!archiveStage) return;
+    const leadTotal = allLeads.filter((l) => l.stageId === archiveStage.id).length;
+    if (leadTotal > 0 && !moveToStageId) {
+      notifications.show({
+        color: "red",
+        title: "Destino obrigatório",
+        message: "Escolha para onde mover os leads deste estágio.",
+      });
+      return;
+    }
+
+    setArchiving(true);
+    try {
+      await api(`/api/v1/stages/${archiveStage.id}`, {
+        method: "PATCH",
+        body: {
+          archived: true,
+          ...(leadTotal > 0 && moveToStageId ? { moveToStageId } : {}),
+        },
+      });
+      notifications.show({
+        color: "green",
+        title: "Estágio arquivado",
+        message: "A coluna saiu do pipeline e do funil do dashboard.",
+      });
+      setArchiveStage(null);
+      await load();
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao arquivar estágio.",
+      });
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -250,7 +362,15 @@ export default function CrmPage() {
           }
         />
       ) : (
-        <KanbanBoard stages={stages} leadsByStage={leadsByStage} onMove={onMove} />
+        <KanbanBoard
+          stages={stages}
+          leadsByStage={leadsByStage}
+          onMove={onMove}
+          onCardMarkerChange={onCardMarkerChange}
+          canManageStages={isAdmin}
+          onRenameStage={openRename}
+          onArchiveStage={openArchive}
+        />
       )}
 
       <Drawer
@@ -350,12 +470,7 @@ export default function CrmPage() {
         </Stack>
       </Drawer>
 
-      <Modal
-        opened={stageModalOpen}
-        onClose={closeStageModal}
-        title="Novo estágio"
-        centered
-      >
+      <Modal opened={stageModalOpen} onClose={closeStageModal} title="Novo estágio" centered>
         <Stack gap="md">
           <TextInput
             label="Nome do estágio"
@@ -377,6 +492,79 @@ export default function CrmPage() {
               onClick={() => void createStage()}
             >
               Criar estágio
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={Boolean(renameStage)}
+        onClose={() => (renaming ? undefined : setRenameStage(null))}
+        title="Renomear estágio"
+        centered
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Nome do estágio"
+            value={renameLabel}
+            onChange={(e) => setRenameLabel(e.currentTarget.value)}
+            data-autofocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void saveRename();
+            }}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setRenameStage(null)} disabled={renaming}>
+              Cancelar
+            </Button>
+            <Button
+              loading={renaming}
+              disabled={!renameLabel.trim()}
+              onClick={() => void saveRename()}
+            >
+              Salvar
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={Boolean(archiveStage)}
+        onClose={() => (archiving ? undefined : setArchiveStage(null))}
+        title="Arquivar estágio"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {archiveStage
+              ? `Arquivar “${archiveStage.label}” remove a coluna do pipeline e do funil do dashboard.`
+              : ""}
+          </Text>
+          {archiveLeadTotal > 0 ? (
+            <Select
+              label={`Mover ${archiveLeadTotal} lead(s) para`}
+              placeholder="Escolha o estágio de destino"
+              data={stages
+                .filter((s) => s.id !== archiveStage?.id)
+                .map((s) => ({ value: s.id, label: s.label }))}
+              value={moveToStageId}
+              onChange={setMoveToStageId}
+              allowDeselect={false}
+            />
+          ) : (
+            <Text size="sm">Este estágio não possui leads ativos.</Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setArchiveStage(null)} disabled={archiving}>
+              Cancelar
+            </Button>
+            <Button
+              color="red"
+              loading={archiving}
+              disabled={archiveLeadTotal > 0 && !moveToStageId}
+              onClick={() => void confirmArchive()}
+            >
+              Arquivar
             </Button>
           </Group>
         </Stack>

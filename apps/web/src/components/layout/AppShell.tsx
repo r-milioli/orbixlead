@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -45,6 +44,7 @@ import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notifications-events";
 import type { AppNotification } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
+import { BrandLogo } from "@/components/common/BrandLogo";
 import { ColorSchemeToggle } from "@/components/layout/ColorSchemeToggle";
 import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
@@ -160,39 +160,7 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 function LogoMark({ collapsed }: { collapsed: boolean }) {
-  return (
-    <Group gap={10} wrap="nowrap" justify={collapsed ? "center" : "flex-start"} w="100%">
-      <Box
-        style={{
-          width: collapsed ? 40 : 36,
-          height: collapsed ? 40 : 36,
-          flexShrink: 0,
-          position: "relative",
-          display: "grid",
-          placeItems: "center",
-        }}
-      >
-        <Image
-          src="/logo.png"
-          alt="Orbixlead"
-          width={collapsed ? 40 : 36}
-          height={collapsed ? 40 : 36}
-          priority
-          style={{ objectFit: "contain", width: "100%", height: "100%" }}
-        />
-      </Box>
-      {!collapsed ? (
-        <Text fw={700} size="lg" style={{ letterSpacing: "-0.02em" }}>
-          <Text span c={colors.primary} inherit>
-            Orbix
-          </Text>
-          <Text span c={colors.textPrimary} inherit>
-            lead
-          </Text>
-        </Text>
-      ) : null}
-    </Group>
-  );
+  return <BrandLogo size={36} collapsed={collapsed} priority />;
 }
 
 function NavLinkItem({

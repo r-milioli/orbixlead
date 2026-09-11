@@ -52,6 +52,15 @@ enum LeadClosedReason {
   LOST
 }
 
+enum LeadCardMarker {
+  NONE
+  URGENT
+  CLOSING
+  WAITING
+  MISSING
+  FOLLOW_UP
+}
+
 enum ScheduleStatus {
   SCHEDULED
   CANCELLED
@@ -169,17 +178,19 @@ model CreditLedger {
 }
 
 model PipelineStage {
-  id       String @id @default(cuid())
-  tenantId String @map("tenant_id")
-  slug     String
-  label    String
-  position Int
+  id         String    @id @default(cuid())
+  tenantId   String    @map("tenant_id")
+  slug       String
+  label      String
+  position   Int
+  archivedAt DateTime? @map("archived_at")
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  leads    Lead[]
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leads  Lead[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, position])
+  @@index([tenantId, archivedAt])
   @@map("pipeline_stages")
 }
 
@@ -204,6 +215,7 @@ model Lead {
   segment               String?
   scrapingJobId         String?      @map("scraping_job_id")
   notes                 String?
+  cardMarker            LeadCardMarker @default(NONE) @map("card_marker")
   closedAt              DateTime?    @map("closed_at")
   closedReason          LeadClosedReason? @map("closed_reason")
   assigneeId            String?      @map("assignee_id")

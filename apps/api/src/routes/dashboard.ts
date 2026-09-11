@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { creditUiState, goalMetrics, KNOWN_PIPELINE_SLUGS } from "@orbixlead/shared";
+import { creditUiState, goalMetrics } from "@orbixlead/shared";
 import { GoalPeriodType, GoalScope, LeadClosedReason, Role } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/serialize";
@@ -69,7 +69,7 @@ router.get(
     }
 
     const stages = await prisma.pipelineStage.findMany({
-      where: { tenantId, slug: { in: [...KNOWN_PIPELINE_SLUGS] } },
+      where: { tenantId, archivedAt: null },
       orderBy: { position: "asc" },
     });
 

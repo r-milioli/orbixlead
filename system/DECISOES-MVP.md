@@ -162,7 +162,8 @@ Usuário pode renomear labels; dashboard só agrega por slug conhecido.
 
 | # | Décisão | Escolha |
 |---|---|---|
-| 34 | Funil dashboard | **Apenas estágios com slug conhecido** |
+| 34 | Funil dashboard | **Todos os estágios ativos do tenant** (mesma ordem/posição do CRM; arquivados não entram) |
+| 34b | Destaque visual do card | Marcadores pré-definidos no lead (`none`, `urgent`, `closing`, `waiting`, `missing`, `follow_up`) alteram a cor do card no Kanban |
 | 35 | Custo por conversão | Campo manual nas configs: **custo médio do lead** (R$) |
 | 36 | Conversão por categoria | Por **segmentação da busca** (nicho) |
 | 37 | Metas | **Várias metas paralelas**; a **mesma meta mensal pode ser decomposta em semanal e diária** |
@@ -243,8 +244,8 @@ Seed rico (48) desde a fatia 1–2 para demo de UI.
 - `CreditLedger` — tipo: grant | reserve | settle | release | adjust
 - `ScrapingJob` — status, params, counts, logs ref
 - `ScrapingResult` — staging por job; soft delete
-- `Lead` — CRM; FK estágio; telefone E.164; temperatura
-- `PipelineStage` — label + slug + position + tenantId
+- `Lead` — CRM; FK estágio; telefone E.164; temperatura; cardMarker (destaque visual)
+- `PipelineStage` — label + slug + position + tenantId + archivedAt (opcional)
 - `MessageTemplate`
 - `Schedule`
 - `Goal` — period_type, parent_id, pricing fields

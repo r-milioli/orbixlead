@@ -5,7 +5,7 @@ import {
   normalizePhoneE164,
   scoreTemperature,
 } from "@orbixlead/shared";
-import { LeadClosedReason, Role, Temperature } from "@prisma/client";
+import { LeadCardMarker, LeadClosedReason, Role, Temperature } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
@@ -29,6 +29,24 @@ const closedReasonToApi: Record<LeadClosedReason, string> = {
   LOST: "lost",
 };
 
+const cardMarkerToApi: Record<LeadCardMarker, string> = {
+  NONE: "none",
+  URGENT: "urgent",
+  CLOSING: "closing",
+  WAITING: "waiting",
+  MISSING: "missing",
+  FOLLOW_UP: "follow_up",
+};
+
+const cardMarkerFromApi: Record<string, LeadCardMarker> = {
+  none: LeadCardMarker.NONE,
+  urgent: LeadCardMarker.URGENT,
+  closing: LeadCardMarker.CLOSING,
+  waiting: LeadCardMarker.WAITING,
+  missing: LeadCardMarker.MISSING,
+  follow_up: LeadCardMarker.FOLLOW_UP,
+};
+
 function serializeLead(lead: {
   id: string;
   tenantId: string;
@@ -48,6 +66,7 @@ function serializeLead(lead: {
   hasWebsite: boolean;
   segment: string | null;
   notes: string | null;
+  cardMarker: LeadCardMarker;
   closedAt: Date | null;
   closedReason: LeadClosedReason | null;
   assigneeId?: string | null;
@@ -79,6 +98,7 @@ function serializeLead(lead: {
     hasWebsite: lead.hasWebsite,
     segment: lead.segment,
     notes: lead.notes,
+    cardMarker: cardMarkerToApi[lead.cardMarker] ?? "none",
     closedAt: lead.closedAt?.toISOString() ?? null,
     closedReason: lead.closedReason ? closedReasonToApi[lead.closedReason] : null,
     assigneeId: lead.assigneeId ?? null,
@@ -531,6 +551,9 @@ router.patch(
       .object({
         notes: z.string().optional(),
         stageId: z.string().optional(),
+        cardMarker: z
+          .enum(["none", "urgent", "closing", "waiting", "missing", "follow_up"])
+          .optional(),
       })
       .parse(req.body);
 
@@ -554,6 +577,9 @@ router.patch(
       data: {
         ...(body.notes !== undefined ? { notes: body.notes } : {}),
         ...(body.stageId ? { stageId: body.stageId } : {}),
+        ...(body.cardMarker !== undefined
+          ? { cardMarker: cardMarkerFromApi[body.cardMarker] }
+          : {}),
       },
       include: leadInclude,
     });

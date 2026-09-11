@@ -26,6 +26,17 @@
   --orbix-danger: #e03131;
   --orbix-danger-bg: #fff5f5;
 
+  --orbix-card-urgent-bg: #fff5f5;
+  --orbix-card-urgent-border: #ffa8a8;
+  --orbix-card-closing-bg: #ebfbee;
+  --orbix-card-closing-border: #8ce99a;
+  --orbix-card-waiting-bg: #fff9db;
+  --orbix-card-waiting-border: #ffe066;
+  --orbix-card-missing-bg: #e7f5ff;
+  --orbix-card-missing-border: #74c0fc;
+  --orbix-card-follow_up-bg: #fff4e6;
+  --orbix-card-follow_up-border: #ffc078;
+
   --orbix-scrollbar: #ced4da;
   --orbix-scrollbar-hover: #868e96;
 }
@@ -55,6 +66,17 @@
   --orbix-warning-bg: rgba(240, 140, 0, 0.18);
   --orbix-danger: #ff6b6b;
   --orbix-danger-bg: rgba(224, 49, 49, 0.18);
+
+  --orbix-card-urgent-bg: rgba(224, 49, 49, 0.18);
+  --orbix-card-urgent-border: rgba(255, 107, 107, 0.55);
+  --orbix-card-closing-bg: rgba(47, 158, 68, 0.18);
+  --orbix-card-closing-border: rgba(81, 207, 102, 0.55);
+  --orbix-card-waiting-bg: rgba(250, 176, 5, 0.16);
+  --orbix-card-waiting-border: rgba(255, 212, 59, 0.55);
+  --orbix-card-missing-bg: rgba(25, 113, 194, 0.18);
+  --orbix-card-missing-border: rgba(116, 192, 252, 0.55);
+  --orbix-card-follow_up-bg: rgba(240, 140, 0, 0.18);
+  --orbix-card-follow_up-border: rgba(255, 169, 77, 0.55);
 
   --orbix-scrollbar: #495057;
   --orbix-scrollbar-hover: #868e96;

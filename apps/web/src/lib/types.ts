@@ -3,6 +3,7 @@ export type PipelineStage = {
   slug: string;
   label: string;
   position: number;
+  archivedAt?: string | null;
 };
 
 export type Lead = {
@@ -22,6 +23,7 @@ export type Lead = {
   hasWebsite?: boolean;
   segment?: string | null;
   notes?: string | null;
+  cardMarker?: "none" | "urgent" | "closing" | "waiting" | "missing" | "follow_up" | string | null;
   stageId: string;
   stage?: PipelineStage;
   closedAt?: string | null;
