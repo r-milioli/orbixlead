@@ -20,6 +20,7 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { DatePickerInput, DateTimePicker } from "@mantine/dates";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import dayjs from "dayjs";
 import "dayjs/locale/pt-br";
@@ -41,7 +42,7 @@ import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { api, ApiError } from "@/lib/api";
 import type { ScheduleItem } from "@/lib/types";
 import { unwrapList, unwrapOne } from "@/lib/unwrap";
-import { colors, ICON_SIZE, ICON_STROKE, radius, shadows } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE, radius, shadows } from "@/theme/tokens";
 
 dayjs.locale("pt-br");
 
@@ -100,6 +101,10 @@ function toApiDatetime(date: Date): string {
 }
 
 export default function AgendaPage() {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
+  const menuWidth = isMobile ? "calc(100vw - 16px)" : 210;
   const [preset, setPreset] = useState<RangePreset>("week");
   const [range, setRange] = useState<[Date | null, Date | null]>(presetRange("week"));
   const [items, setItems] = useState<ScheduleItem[]>([]);
@@ -287,10 +292,14 @@ export default function AgendaPage() {
     <>
       <PageHeader
         title="Agenda"
-        subtitle="Retornos e compromissos com leads, organizados por dia"
+        subtitle={
+          isMobile
+            ? "Retornos e compromissos por dia"
+            : "Retornos e compromissos com leads, organizados por dia"
+        }
         actions={
-          <Group gap="sm" wrap="wrap" justify="flex-end">
-            <Group gap={6}>
+          <Stack gap="sm" w={isMobile ? "100%" : undefined}>
+            <Group gap={6} grow={!!isMobile} wrap="nowrap">
               {(
                 [
                   { id: "today", label: "Hoje" },
@@ -302,10 +311,11 @@ export default function AgendaPage() {
                   key={chip.id}
                   onClick={() => applyPreset(chip.id)}
                   style={{
-                    padding: "6px 12px",
+                    padding: isMobile ? "8px 10px" : "6px 12px",
                     borderRadius: radius.md,
                     fontSize: 13,
                     fontWeight: 600,
+                    textAlign: "center",
                     border: `1px solid ${
                       preset === chip.id ? colors.primary : colors.borderLight
                     }`,
@@ -331,20 +341,22 @@ export default function AgendaPage() {
               locale="pt-br"
               valueFormat="DD/MM/YYYY"
               leftSection={<Calendar size={16} strokeWidth={ICON_STROKE} />}
-              w={260}
+              w={isMobile ? "100%" : 260}
+              size={isMobile ? "sm" : "md"}
+              dropdownType={isMobile ? "modal" : "popover"}
               styles={{
                 input: {
                   borderRadius: radius.md,
                 },
               }}
             />
-          </Group>
+          </Stack>
         }
       />
 
       {!loading && items.length > 0 ? (
-        <Group gap="md" mb="lg">
-          <Text size="sm" c={colors.textMuted}>
+        <Group gap="sm" mb="lg" wrap="wrap">
+          <Text size="sm" c={colors.textMuted} style={{ flex: "1 1 160px" }}>
             <Text span fw={600} c={colors.textPrimary}>
               {activeItems.length}
             </Text>{" "}
@@ -374,7 +386,7 @@ export default function AgendaPage() {
           icon={Calendar}
         />
       ) : (
-        <Stack gap="xl">
+        <Stack gap={isMobile ? "lg" : "xl"}>
           {grouped.map(({ day, dayItems }) => {
             const dayDate = dayjs(day);
             const isToday = dayDate.isSame(dayjs(), "day");
@@ -387,18 +399,19 @@ export default function AgendaPage() {
 
             return (
               <Box key={day}>
-                <Group gap="sm" mb="sm" align="baseline">
+                <Group gap="sm" mb="sm" align="baseline" wrap="wrap">
                   <Title
                     order={5}
                     style={{
                       textTransform: "capitalize",
                       letterSpacing: "-0.01em",
+                      fontSize: isMobile ? 15 : undefined,
                     }}
                   >
                     {dayLabel}
                   </Title>
                   <Text size="sm" c={colors.textMuted}>
-                    {dayDate.format("DD [de] MMMM")}
+                    {dayDate.format(isMobile ? "DD/MM" : "DD [de] MMMM")}
                   </Text>
                   <Badge variant="light" color={isToday ? "orbix" : "gray"} size="sm">
                     {dayItems.length}
@@ -417,29 +430,32 @@ export default function AgendaPage() {
                         key={item.id}
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "72px 1fr",
-                          gap: 12,
+                          gridTemplateColumns: isMobile ? "1fr" : "72px 1fr",
+                          gap: isMobile ? 8 : 12,
                           alignItems: "stretch",
                           opacity: cancelled ? 0.78 : 1,
+                          minWidth: 0,
                         }}
                       >
-                        <Stack gap={2} align="flex-end" justify="flex-start" pt={14}>
-                          <Text
-                            fw={700}
-                            style={{
-                              fontSize: 18,
-                              lineHeight: 1.1,
-                              color: style.timeColor,
-                              letterSpacing: "-0.02em",
-                              textDecoration: cancelled ? "line-through" : undefined,
-                            }}
-                          >
-                            {when.format("HH:mm")}
-                          </Text>
-                          <Text size="xs" c={colors.textMuted} tt="capitalize">
-                            {when.format("ddd")}
-                          </Text>
-                        </Stack>
+                        {!isMobile ? (
+                          <Stack gap={2} align="flex-end" justify="flex-start" pt={14}>
+                            <Text
+                              fw={700}
+                              style={{
+                                fontSize: 18,
+                                lineHeight: 1.1,
+                                color: style.timeColor,
+                                letterSpacing: "-0.02em",
+                                textDecoration: cancelled ? "line-through" : undefined,
+                              }}
+                            >
+                              {when.format("HH:mm")}
+                            </Text>
+                            <Text size="xs" c={colors.textMuted} tt="capitalize">
+                              {when.format("ddd")}
+                            </Text>
+                          </Stack>
+                        ) : null}
 
                         <Box
                           style={{
@@ -449,6 +465,7 @@ export default function AgendaPage() {
                             borderRadius: radius.lg,
                             boxShadow: shadows.xs,
                             overflow: "hidden",
+                            minWidth: 0,
                           }}
                         >
                           <Box
@@ -466,21 +483,40 @@ export default function AgendaPage() {
                             justify="space-between"
                             align="flex-start"
                             wrap="wrap"
-                            gap="md"
-                            p="md"
-                            pl={18}
+                            gap="sm"
+                            p={isMobile ? "sm" : "md"}
+                            pl={isMobile ? 14 : 18}
                           >
-                            <Stack gap={8} style={{ flex: "1 1 240px", minWidth: 0 }}>
+                            <Stack gap={8} style={{ flex: "1 1 200px", minWidth: 0 }}>
                               <Group gap={8} wrap="wrap">
+                                {isMobile ? (
+                                  <Text
+                                    fw={700}
+                                    style={{
+                                      fontSize: 16,
+                                      color: style.timeColor,
+                                      letterSpacing: "-0.02em",
+                                      textDecoration: cancelled ? "line-through" : undefined,
+                                    }}
+                                  >
+                                    {when.format("HH:mm")}
+                                  </Text>
+                                ) : null}
                                 <Badge variant="light" color={style.badge} size="sm">
                                   {style.label}
                                 </Badge>
-                                <Group gap={6}>
-                                  <Clock3 size={14} color={colors.textMuted} strokeWidth={ICON_STROKE} />
-                                  <Text size="xs" c={colors.textMuted}>
-                                    {when.format("DD/MM/YYYY · HH:mm")}
-                                  </Text>
-                                </Group>
+                                {!isMobile ? (
+                                  <Group gap={6}>
+                                    <Clock3
+                                      size={14}
+                                      color={colors.textMuted}
+                                      strokeWidth={ICON_STROKE}
+                                    />
+                                    <Text size="xs" c={colors.textMuted}>
+                                      {when.format("DD/MM/YYYY · HH:mm")}
+                                    </Text>
+                                  </Group>
+                                ) : null}
                               </Group>
 
                               <div>
@@ -489,6 +525,7 @@ export default function AgendaPage() {
                                     size={16}
                                     color={colors.textSecondary}
                                     strokeWidth={ICON_STROKE}
+                                    style={{ flexShrink: 0 }}
                                   />
                                   <Text
                                     fw={600}
@@ -497,13 +534,14 @@ export default function AgendaPage() {
                                       letterSpacing: "-0.01em",
                                       color: colors.textPrimary,
                                       textDecoration: cancelled ? "line-through" : undefined,
+                                      minWidth: 0,
                                     }}
-                                    lineClamp={1}
+                                    lineClamp={2}
                                   >
                                     {item.lead?.companyName || "Lead"}
                                   </Text>
                                 </Group>
-                                <Text size="sm" fw={600} c={colors.textSecondary}>
+                                <Text size="sm" fw={600} c={colors.textSecondary} lineClamp={2}>
                                   {item.reason}
                                 </Text>
                                 {item.notes ? (
@@ -513,7 +551,7 @@ export default function AgendaPage() {
                                 ) : null}
                               </div>
 
-                              <Group gap={6} mt={2}>
+                              <Group gap={6} mt={2} grow={!!isMobile} wrap="wrap">
                                 {item.lead?.phoneE164 ? (
                                   <Button
                                     component="a"
@@ -541,7 +579,12 @@ export default function AgendaPage() {
                               </Group>
                             </Stack>
 
-                            <Menu shadow="md" width={210} position="bottom-end" withinPortal>
+                            <Menu
+                              shadow="md"
+                              width={menuWidth}
+                              position="bottom-end"
+                              withinPortal
+                            >
                               <Menu.Target>
                                 <ActionIcon variant="subtle" color="gray" aria-label="Ações">
                                   <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
@@ -598,10 +641,11 @@ export default function AgendaPage() {
         title={editor?.mode === "reschedule" ? "Reagendar" : "Editar agendamento"}
         centered
         radius="lg"
+        fullScreen={!!isMobile}
       >
         <form onSubmit={saveEditor}>
           <Stack gap="md">
-            <Text size="sm" c={colors.textMuted}>
+            <Text size="sm" c={colors.textMuted} lineClamp={2}>
               {editor?.item.lead?.companyName || "Lead"}
             </Text>
             <DateTimePicker
@@ -617,6 +661,8 @@ export default function AgendaPage() {
               }}
               locale="pt-br"
               valueFormat="DD/MM/YYYY HH:mm"
+              size={isMobile ? "sm" : "md"}
+              dropdownType={isMobile ? "modal" : "popover"}
             />
             {editor?.mode === "edit" ? (
               <>
@@ -625,12 +671,14 @@ export default function AgendaPage() {
                   required
                   value={editReason}
                   onChange={(e) => setEditReason(e.currentTarget.value)}
+                  size={isMobile ? "sm" : "md"}
                 />
                 <Textarea
                   label="Anotações"
                   minRows={3}
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.currentTarget.value)}
+                  size={isMobile ? "sm" : "md"}
                 />
               </>
             ) : (
@@ -638,7 +686,7 @@ export default function AgendaPage() {
                 Motivo atual: <Text span fw={600}>{editReason}</Text>
               </Text>
             )}
-            <Group justify="flex-end" gap="sm">
+            <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} gap="sm" wrap="wrap">
               <Button variant="default" onClick={closeEditor} disabled={saving}>
                 Voltar
               </Button>

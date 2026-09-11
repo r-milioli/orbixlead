@@ -24,6 +24,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { ArrowLeft, Archive, Globe, MapPin, MessageCircle, Phone, RotateCcw, Trash2, UserRound } from "lucide-react";
 import dayjs from "dayjs";
@@ -39,7 +40,7 @@ import {
 } from "@/lib/cardMarkers";
 import type { Lead, PipelineStage, ScheduleItem } from "@/lib/types";
 import { unwrapList, unwrapOne } from "@/lib/unwrap";
-import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 import type { LeadCardMarker } from "@orbixlead/shared";
 
 function websiteHref(url: string): string {
@@ -51,6 +52,10 @@ export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user, isAdmin, isOperador } = useAuth();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
+  const cardPad = isMobile ? "md" : "lg";
   const [lead, setLead] = useState<Lead | null>(null);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
@@ -321,19 +326,27 @@ export default function LeadDetailPage() {
 
   return (
     <>
-      <Anchor component={Link} href="/crm" size="sm" c={colors.textSecondary} mb="md">
-        <Group gap={6}>
-          <ArrowLeft size={16} />
+      <Anchor component={Link} href="/crm" size="sm" c={colors.textSecondary} mb="md" display="inline-block">
+        <Group gap={6} wrap="nowrap">
+          <ArrowLeft size={16} style={{ flexShrink: 0 }} />
           Voltar ao CRM
         </Group>
       </Anchor>
 
-      <Group justify="space-between" align="flex-start" mb="xl" wrap="wrap">
-        <div>
-          <Title order={2} mb={8}>
+      <Stack gap={isMobile ? "md" : "xl"} mb={isMobile ? "md" : "xl"}>
+        <Box style={{ minWidth: 0 }}>
+          <Title
+            order={2}
+            mb={8}
+            style={{
+              fontSize: isMobile ? 22 : undefined,
+              lineHeight: 1.25,
+              wordBreak: "break-word",
+            }}
+          >
             {lead.companyName}
           </Title>
-          <Group gap="sm">
+          <Group gap="sm" wrap="wrap">
             <TemperatureBadge value={lead.temperature} />
             {lead.closedAt ? (
               <Badge
@@ -348,84 +361,97 @@ export default function LeadDetailPage() {
                     : "Arquivado"}
               </Badge>
             ) : null}
-            <Text size="sm" c={colors.textMuted}>
+            <Text size="sm" c={colors.textMuted} style={{ flex: "1 1 140px" }}>
               {lead.city || "—"}
               {lead.segment ? ` · ${lead.segment}` : ""}
             </Text>
           </Group>
-        </div>
-        <Group>
-          <Button
-            variant="default"
-            leftSection={<Phone size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-            component="a"
-            href={`tel:${lead.phoneE164}`}
-          >
-            Ligar
-          </Button>
-          <Button
-            leftSection={<MessageCircle size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-            onClick={() => setWaOpen(true)}
-          >
-            WhatsApp
-          </Button>
-          {lead.mapsUrl ? (
-            <Button
-              variant="light"
-              leftSection={<MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-              component="a"
-              href={lead.mapsUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Maps
-            </Button>
-          ) : null}
-          {lead.closedAt ? (
-            <Button
-              variant="light"
-              leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-              loading={reopening}
-              onClick={() => void reopenLead()}
-            >
-              Reabrir
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="light"
-                color="green"
-                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                onClick={() => setPendingCloseReason("converted")}
-              >
-                Converter
-              </Button>
-              <Button
-                variant="light"
-                color="gray"
-                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                onClick={() => setPendingCloseReason("lost")}
-              >
-                Perder
-              </Button>
-            </>
-          )}
-          {isAdmin ? (
-            <Button
-              color="red"
-              variant="light"
-              leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              Excluir
-            </Button>
-          ) : null}
-        </Group>
-      </Group>
+        </Box>
 
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-        <Card padding="lg">
-          <Title order={4} mb="md">
+        <Stack gap={8}>
+          <Group gap={8} grow={!!isMobile} wrap="wrap">
+            <Button
+              variant="default"
+              size={isMobile ? "sm" : "md"}
+              leftSection={<Phone size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+              component="a"
+              href={`tel:${lead.phoneE164}`}
+            >
+              Ligar
+            </Button>
+            <Button
+              size={isMobile ? "sm" : "md"}
+              leftSection={<MessageCircle size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+              onClick={() => setWaOpen(true)}
+            >
+              WhatsApp
+            </Button>
+            {lead.mapsUrl ? (
+              <Button
+                variant="light"
+                size={isMobile ? "sm" : "md"}
+                leftSection={<MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                component="a"
+                href={lead.mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Maps
+              </Button>
+            ) : null}
+          </Group>
+
+          <Group gap={8} grow={!!isMobile} wrap="wrap">
+            {lead.closedAt ? (
+              <Button
+                variant="light"
+                size={isMobile ? "sm" : "md"}
+                leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                loading={reopening}
+                onClick={() => void reopenLead()}
+              >
+                Reabrir
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="light"
+                  color="green"
+                  size={isMobile ? "sm" : "md"}
+                  leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                  onClick={() => setPendingCloseReason("converted")}
+                >
+                  Converter
+                </Button>
+                <Button
+                  variant="light"
+                  color="gray"
+                  size={isMobile ? "sm" : "md"}
+                  leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                  onClick={() => setPendingCloseReason("lost")}
+                >
+                  Perder
+                </Button>
+              </>
+            )}
+            {isAdmin ? (
+              <Button
+                color="red"
+                variant="light"
+                size={isMobile ? "sm" : "md"}
+                leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                onClick={() => setConfirmDeleteOpen(true)}
+              >
+                Excluir
+              </Button>
+            ) : null}
+          </Group>
+        </Stack>
+      </Stack>
+
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing={isMobile ? "md" : "lg"}>
+        <Card padding={cardPad} style={{ minWidth: 0 }}>
+          <Title order={4} mb="md" style={{ fontSize: isMobile ? 16 : undefined }}>
             Informações
           </Title>
           <Stack gap="sm">
@@ -435,6 +461,7 @@ export default function LeadDetailPage() {
               value={lead.stageId}
               onChange={(v) => void moveStage(v)}
               disabled={Boolean(lead.closedAt)}
+              size={isMobile ? "sm" : "md"}
               description={
                 lead.closedAt
                   ? "Lead encerrado — reabra para alterar o estágio"
@@ -447,11 +474,12 @@ export default function LeadDetailPage() {
                 Acompanhado por
               </Text>
               {lead.assignee ? (
-                <Group gap="xs" mb={8}>
+                <Group gap="xs" mb={8} wrap="wrap">
                   <Badge
                     variant="light"
                     color="orbix"
                     leftSection={<UserRound size={12} />}
+                    style={{ maxWidth: "100%" }}
                   >
                     {lead.assignee.name}
                   </Badge>
@@ -478,6 +506,7 @@ export default function LeadDetailPage() {
                       value={lead.assigneeId ?? null}
                       disabled={assigning}
                       onChange={(v) => void setAssignee(v)}
+                      size={isMobile ? "sm" : "md"}
                       description="Somente admin pode trocar o operador responsável"
                     />
                   ) : null}
@@ -489,7 +518,8 @@ export default function LeadDetailPage() {
                       loading={assigning}
                       leftSection={<UserRound size={14} />}
                       onClick={() => void setAssignee(user!.id)}
-                      w="fit-content"
+                      fullWidth={!!isMobile}
+                      w={isMobile ? undefined : "fit-content"}
                     >
                       Assumir acompanhamento
                     </Button>
@@ -501,7 +531,8 @@ export default function LeadDetailPage() {
                       variant="default"
                       loading={assigning}
                       onClick={() => setConfirmReleaseOpen(true)}
-                      w="fit-content"
+                      fullWidth={!!isMobile}
+                      w={isMobile ? undefined : "fit-content"}
                     >
                       Liberar acompanhamento
                     </Button>
@@ -519,13 +550,17 @@ export default function LeadDetailPage() {
               ) : null}
             </div>
 
-            <TextInput label="Telefone" value={lead.phoneE164} readOnly />
-            <TextInput label="Cidade" value={lead.city || ""} readOnly />
-            <TextInput label="Endereço" value={lead.address || ""} readOnly />
+            <TextInput label="Telefone" value={lead.phoneE164} readOnly size={isMobile ? "sm" : "md"} />
+            <TextInput label="Cidade" value={lead.city || ""} readOnly size={isMobile ? "sm" : "md"} />
+            <TextInput label="Endereço" value={lead.address || ""} readOnly size={isMobile ? "sm" : "md"} />
             <TextInput
               label="Site"
               value={lead.website || "Sem site"}
               readOnly
+              size={isMobile ? "sm" : "md"}
+              styles={{
+                input: { overflow: "hidden", textOverflow: "ellipsis" },
+              }}
               rightSection={
                 lead.website ? (
                   <Tooltip label="Abrir site">
@@ -568,6 +603,7 @@ export default function LeadDetailPage() {
                   rel="noreferrer"
                   variant="default"
                   size="sm"
+                  fullWidth={!!isMobile}
                   leftSection={<MapPin size={16} strokeWidth={ICON_STROKE} />}
                 >
                   Abrir perfil
@@ -587,11 +623,23 @@ export default function LeadDetailPage() {
                   Nenhuma
                 </Text>
               ) : (
-                socialList.map((url) => (
-                  <Text key={String(url)} size="sm" component="a" href={String(url)} target="_blank">
-                    {String(url)}
-                  </Text>
-                ))
+                <Stack gap={4}>
+                  {socialList.map((url) => (
+                    <Text
+                      key={String(url)}
+                      size="sm"
+                      component="a"
+                      href={String(url)}
+                      target="_blank"
+                      style={{
+                        wordBreak: "break-all",
+                        display: "block",
+                      }}
+                    >
+                      {String(url)}
+                    </Text>
+                  ))}
+                </Stack>
               )}
             </div>
             <Divider my="xs" />
@@ -600,13 +648,14 @@ export default function LeadDetailPage() {
               description="Cor do card no Kanban para prioridade e status visual"
               data={LEAD_CARD_MARKERS.map((m) => ({
                 value: m.value,
-                label: `${m.label} — ${m.description}`,
+                label: isMobile ? m.label : `${m.label} — ${m.description}`,
               }))}
               value={normalizeCardMarker(lead.cardMarker)}
               onChange={(value) => {
                 if (value) void saveCardMarker(value as LeadCardMarker);
               }}
               allowDeselect={false}
+              size={isMobile ? "sm" : "md"}
               leftSection={
                 <Box
                   style={{
@@ -622,18 +671,24 @@ export default function LeadDetailPage() {
             />
             <Textarea
               label="Anotações"
-              minRows={4}
+              minRows={isMobile ? 3 : 4}
               value={notes}
               onChange={(e) => setNotes(e.currentTarget.value)}
+              size={isMobile ? "sm" : "md"}
             />
-            <Button onClick={() => void saveNotes()} loading={saving} w="fit-content">
+            <Button
+              onClick={() => void saveNotes()}
+              loading={saving}
+              fullWidth={!!isMobile}
+              w={isMobile ? undefined : "fit-content"}
+            >
               Salvar anotações
             </Button>
           </Stack>
         </Card>
 
-        <Card padding="lg">
-          <Title order={4} mb="md">
+        <Card padding={cardPad} style={{ minWidth: 0 }}>
+          <Title order={4} mb="md" style={{ fontSize: isMobile ? 16 : undefined }}>
             Agendamento
           </Title>
           <form onSubmit={createSchedule}>
@@ -650,20 +705,24 @@ export default function LeadDetailPage() {
                 }}
                 locale="pt-br"
                 valueFormat="DD/MM/YYYY HH:mm"
+                size={isMobile ? "sm" : "md"}
+                dropdownType={isMobile ? "modal" : "popover"}
               />
               <TextInput
                 label="Motivo"
                 required
                 value={reason}
                 onChange={(e) => setReason(e.currentTarget.value)}
+                size={isMobile ? "sm" : "md"}
               />
               <Textarea
                 label="Anotações"
                 minRows={3}
                 value={scheduleNotes}
                 onChange={(e) => setScheduleNotes(e.currentTarget.value)}
+                size={isMobile ? "sm" : "md"}
               />
-              <Button type="submit" loading={saving}>
+              <Button type="submit" loading={saving} fullWidth={!!isMobile}>
                 Agendar retorno
               </Button>
             </Stack>
@@ -682,10 +741,10 @@ export default function LeadDetailPage() {
               {schedules.map((s) => {
                 const cancelled = (s.status || "").toLowerCase() === "cancelled";
                 return (
-                  <Card key={s.id} padding="sm" withBorder shadow="none">
-                    <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
-                      <div style={{ minWidth: 0 }}>
-                        <Group gap={8} mb={4}>
+                  <Card key={s.id} padding="sm" withBorder shadow="none" style={{ minWidth: 0 }}>
+                    <Stack gap="sm">
+                      <Box style={{ minWidth: 0 }}>
+                        <Group gap={8} mb={4} wrap="wrap">
                           <Text
                             size="sm"
                             fw={600}
@@ -701,12 +760,12 @@ export default function LeadDetailPage() {
                         </Group>
                         <Text size="sm">{s.reason}</Text>
                         {s.notes ? (
-                          <Text size="xs" c={colors.textMuted}>
+                          <Text size="xs" c={colors.textMuted} style={{ wordBreak: "break-word" }}>
                             {s.notes}
                           </Text>
                         ) : null}
-                      </div>
-                      <Group gap={4} wrap="nowrap">
+                      </Box>
+                      <Group gap={4} grow={!!isMobile} wrap="wrap">
                         {!cancelled ? (
                           <Button
                             size="compact-xs"
@@ -764,7 +823,7 @@ export default function LeadDetailPage() {
                           Excluir
                         </Button>
                       </Group>
-                    </Group>
+                    </Stack>
                   </Card>
                 );
               })}

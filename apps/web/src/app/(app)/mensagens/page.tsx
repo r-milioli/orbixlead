@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import {
+  Box,
   Button,
   Card,
   Group,
@@ -14,6 +15,7 @@ import {
   Center,
   Loader,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { applyTemplate } from "@orbixlead/shared";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -23,9 +25,12 @@ import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { api, ApiError } from "@/lib/api";
 import type { MessageTemplate } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
-import { colors } from "@/theme/tokens";
+import { colors, layout } from "@/theme/tokens";
 
 export default function MensagensPage() {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [opened, setOpened] = useState(false);
@@ -139,10 +144,18 @@ export default function MensagensPage() {
     <>
       <PageHeader
         title="Mensagens"
-        subtitle="Templates para WhatsApp com variáveis {nome} e {empresa}"
+        subtitle={
+          isMobile
+            ? "Templates WhatsApp com {nome} e {empresa}"
+            : "Templates para WhatsApp com variáveis {nome} e {empresa}"
+        }
         actions={
-          <Button leftSection={<Plus size={16} />} onClick={openCreate}>
-            Novo template
+          <Button
+            size={isMobile ? "sm" : "md"}
+            leftSection={<Plus size={16} />}
+            onClick={openCreate}
+          >
+            {isMobile ? "Novo" : "Novo template"}
           </Button>
         }
       />
@@ -164,19 +177,29 @@ export default function MensagensPage() {
       ) : (
         <Stack gap="sm">
           {templates.map((tpl) => (
-            <Card key={tpl.id} padding="md" withBorder>
-              <Group justify="space-between" align="flex-start">
-                <div style={{ flex: 1 }}>
-                  <Title order={5} mb={6}>
+            <Card key={tpl.id} padding={isMobile ? "sm" : "md"} withBorder style={{ minWidth: 0 }}>
+              <Stack gap="sm">
+                <Box style={{ minWidth: 0 }}>
+                  <Title
+                    order={5}
+                    mb={6}
+                    style={{ fontSize: isMobile ? 15 : undefined, wordBreak: "break-word" }}
+                  >
                     {tpl.name}
                   </Title>
-                  <Text size="sm" c={colors.textSecondary} lineClamp={3}>
+                  <Text
+                    size="sm"
+                    c={colors.textSecondary}
+                    lineClamp={isMobile ? 4 : 3}
+                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                  >
                     {tpl.body}
                   </Text>
-                </div>
-                <Group gap={6}>
+                </Box>
+                <Group gap={6} grow={!!isMobile} wrap="wrap">
                   <Button
                     variant="subtle"
+                    size={isMobile ? "sm" : "md"}
                     leftSection={<Pencil size={14} />}
                     onClick={() => openEdit(tpl)}
                   >
@@ -185,13 +208,14 @@ export default function MensagensPage() {
                   <Button
                     variant="subtle"
                     color="red"
+                    size={isMobile ? "sm" : "md"}
                     leftSection={<Trash2 size={14} />}
                     onClick={() => setPendingDelete(tpl)}
                   >
                     Excluir
                   </Button>
                 </Group>
-              </Group>
+              </Stack>
             </Card>
           ))}
         </Stack>
@@ -202,6 +226,8 @@ export default function MensagensPage() {
         onClose={() => setOpened(false)}
         title={editing ? "Editar template" : "Novo template"}
         size="lg"
+        centered
+        fullScreen={!!isMobile}
       >
         <form onSubmit={onSubmit}>
           <Stack gap="md">
@@ -210,15 +236,17 @@ export default function MensagensPage() {
               required
               value={name}
               onChange={(e) => setName(e.currentTarget.value)}
+              size={isMobile ? "sm" : "md"}
             />
             <Textarea
               label="Mensagem"
               required
-              minRows={6}
+              minRows={isMobile ? 5 : 6}
               value={body}
               onChange={(e) => setBody(e.currentTarget.value)}
+              size={isMobile ? "sm" : "md"}
             />
-            <Group gap="xs">
+            <Group gap="xs" wrap="wrap" align="center">
               <Text size="sm" c={colors.textMuted}>
                 Variáveis:
               </Text>
@@ -233,11 +261,11 @@ export default function MensagensPage() {
               <Text size="xs" fw={600} mb={6} c={colors.textMuted}>
                 Preview
               </Text>
-              <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+              <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
                 {preview}
               </Text>
             </Card>
-            <Group justify="flex-end">
+            <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} wrap="wrap">
               <Button variant="default" onClick={() => setOpened(false)}>
                 Cancelar
               </Button>

@@ -14,7 +14,7 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
+import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { ArchiveRestore, Plus, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -25,7 +25,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Lead, PipelineStage } from "@/lib/types";
 import { normalizeTemperature } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
-import { ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 import type { LeadCardMarker } from "@orbixlead/shared";
 
 type AdvancedFilters = {
@@ -48,6 +48,9 @@ const DEFAULT_FILTERS: AdvancedFilters = {
 
 export default function CrmPage() {
   const { isAdmin, user } = useAuth();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -360,11 +363,16 @@ export default function CrmPage() {
     <>
       <PageHeader
         title="Pipeline"
-        subtitle="Kanban dos leads ativos. Convertidos e perdidos encerrados ficam em Leads → Encerrados."
+        subtitle={
+          isMobile
+            ? "Kanban dos leads ativos. Encerrados ficam em Leads."
+            : "Kanban dos leads ativos. Convertidos e perdidos encerrados ficam em Leads → Encerrados."
+        }
         actions={
-          <Group gap="sm">
+          <>
             <Button
               variant="default"
+              size={isMobile ? "sm" : "md"}
               leftSection={<SlidersHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
               onClick={() => {
                 setDraftFilters(appliedFilters);
@@ -378,25 +386,27 @@ export default function CrmPage() {
               <>
                 <Button
                   variant="default"
+                  size={isMobile ? "sm" : "md"}
                   leftSection={<ArchiveRestore size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
                   onClick={openArchivedStages}
                 >
                   Arquivados
                 </Button>
                 <Button
+                  size={isMobile ? "sm" : "md"}
                   leftSection={<Plus size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
                   onClick={openStageModal}
                 >
-                  Novo estágio
+                  {isMobile ? "Novo" : "Novo estágio"}
                 </Button>
               </>
             ) : null}
-          </Group>
+          </>
         }
       />
 
       {loading ? (
-        <Center mih={320}>
+        <Center mih={isMobile ? 240 : 320}>
           <Loader color="orbix" />
         </Center>
       ) : stages.length === 0 ? (
@@ -437,7 +447,7 @@ export default function CrmPage() {
         opened={filtersOpen}
         onClose={closeFilters}
         position="right"
-        size={420}
+        size={isMobile ? "100%" : 420}
         title="Filtros avançados"
         padding="md"
         overlayProps={{ backgroundOpacity: 0.45 }}
@@ -447,7 +457,7 @@ export default function CrmPage() {
             <Text size="sm" fw={600} mb={8}>
               Temperatura
             </Text>
-            <Group gap="md">
+            <Group gap="md" wrap="wrap">
               {(["frio", "morno", "quente"] as const).map((temp) => (
                 <Checkbox
                   key={temp}
@@ -521,7 +531,7 @@ export default function CrmPage() {
             }}
           />
 
-          <Group justify="space-between" mt="md">
+          <Group justify="space-between" mt="md" grow={!!isMobile} wrap="wrap">
             <Button variant="subtle" onClick={clearFilters}>
               Limpar filtros
             </Button>
@@ -530,7 +540,13 @@ export default function CrmPage() {
         </Stack>
       </Drawer>
 
-      <Modal opened={stageModalOpen} onClose={closeStageModal} title="Novo estágio" centered>
+      <Modal
+        opened={stageModalOpen}
+        onClose={closeStageModal}
+        title="Novo estágio"
+        centered
+        fullScreen={!!isMobile}
+      >
         <Stack gap="md">
           <TextInput
             label="Nome do estágio"
@@ -542,7 +558,7 @@ export default function CrmPage() {
               if (e.key === "Enter") void createStage();
             }}
           />
-          <Group justify="flex-end">
+          <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} wrap="wrap">
             <Button variant="default" onClick={closeStageModal}>
               Cancelar
             </Button>
@@ -562,7 +578,8 @@ export default function CrmPage() {
         onClose={closeArchivedModal}
         title="Estágios arquivados"
         centered
-        size="md"
+        size={isMobile ? "100%" : "md"}
+        fullScreen={!!isMobile}
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
@@ -577,8 +594,8 @@ export default function CrmPage() {
           ) : (
             <Stack gap="sm">
               {archivedStages.map((stage) => (
-                <Group key={stage.id} justify="space-between" wrap="nowrap">
-                  <div style={{ minWidth: 0 }}>
+                <Group key={stage.id} justify="space-between" wrap="wrap" gap="sm">
+                  <div style={{ minWidth: 0, flex: "1 1 140px" }}>
                     <Text size="sm" fw={600} lineClamp={1}>
                       {stage.label}
                     </Text>
@@ -591,6 +608,7 @@ export default function CrmPage() {
                     variant="light"
                     loading={restoringId === stage.id}
                     onClick={() => void restoreStage(stage)}
+                    fullWidth={!!isMobile}
                   >
                     Desarquivar
                   </Button>
@@ -598,7 +616,7 @@ export default function CrmPage() {
               ))}
             </Stack>
           )}
-          <Group justify="flex-end">
+          <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile}>
             <Button variant="default" onClick={closeArchivedModal}>
               Fechar
             </Button>
@@ -611,6 +629,7 @@ export default function CrmPage() {
         onClose={() => (renaming ? undefined : setRenameStage(null))}
         title="Renomear estágio"
         centered
+        fullScreen={!!isMobile}
       >
         <Stack gap="md">
           <TextInput
@@ -622,7 +641,7 @@ export default function CrmPage() {
               if (e.key === "Enter") void saveRename();
             }}
           />
-          <Group justify="flex-end">
+          <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} wrap="wrap">
             <Button variant="default" onClick={() => setRenameStage(null)} disabled={renaming}>
               Cancelar
             </Button>
@@ -642,6 +661,7 @@ export default function CrmPage() {
         onClose={() => (archiving ? undefined : setArchiveStage(null))}
         title="Arquivar estágio"
         centered
+        fullScreen={!!isMobile}
       >
         <Stack gap="md">
           <Text size="sm" c="dimmed">
@@ -663,7 +683,7 @@ export default function CrmPage() {
           ) : (
             <Text size="sm">Este estágio não possui leads ativos.</Text>
           )}
-          <Group justify="flex-end">
+          <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} wrap="wrap">
             <Button variant="default" onClick={() => setArchiveStage(null)} disabled={archiving}>
               Cancelar
             </Button>

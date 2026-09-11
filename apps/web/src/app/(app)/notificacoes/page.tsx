@@ -13,6 +13,7 @@ import {
   Tabs,
   Text,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications as toast } from "@mantine/notifications";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -21,12 +22,20 @@ import { api, ApiError } from "@/lib/api";
 import { emitNotificationsChanged } from "@/lib/notifications-events";
 import type { AppNotification } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
-import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 type TabFilter = "all" | "unread" | "read";
 
-function formatWhen(iso: string) {
+function formatWhen(iso: string, compact = false) {
   const d = new Date(iso);
+  if (compact) {
+    return d.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
   return d.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "short",
@@ -37,6 +46,9 @@ function formatWhen(iso: string) {
 }
 
 export default function NotificacoesPage() {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabFilter>("all");
@@ -117,23 +129,33 @@ export default function NotificacoesPage() {
     <>
       <PageHeader
         title="Notificações"
-        subtitle="Histórico completo. O sininho mostra apenas as não lidas."
+        subtitle={
+          isMobile
+            ? "Histórico completo. O sininho mostra só as não lidas."
+            : "Histórico completo. O sininho mostra apenas as não lidas."
+        }
         actions={
           unreadCount > 0 ? (
             <Button
               variant="default"
+              size={isMobile ? "sm" : "md"}
               leftSection={<CheckCheck size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
               loading={markingAll}
               onClick={() => void markAllRead()}
             >
-              Marcar todas como lidas
+              {isMobile ? "Marcar todas" : "Marcar todas como lidas"}
             </Button>
           ) : null
         }
       />
 
-      <Tabs value={tab} onChange={(v) => setTab((v as TabFilter) || "all")} color="orbix" mb="lg">
-        <Tabs.List>
+      <Tabs
+        value={tab}
+        onChange={(v) => setTab((v as TabFilter) || "all")}
+        color="orbix"
+        mb="lg"
+      >
+        <Tabs.List grow={!!isMobile}>
           <Tabs.Tab value="all">Todas ({items.length})</Tabs.Tab>
           <Tabs.Tab value="unread">Não lidas ({unreadCount})</Tabs.Tab>
           <Tabs.Tab value="read">Lidas ({readCount})</Tabs.Tab>
@@ -167,17 +189,27 @@ export default function NotificacoesPage() {
             return (
               <Card
                 key={n.id}
-                padding="md"
+                padding={isMobile ? "sm" : "md"}
                 withBorder
                 style={{
                   background: unread ? colors.primaryLight : colors.surface,
                   borderColor: unread ? colors.primary : colors.border,
+                  minWidth: 0,
                 }}
               >
-                <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
-                  <Box style={{ minWidth: 0, flex: 1 }}>
-                    <Group gap={8} mb={4}>
-                      <Text fw={700} style={{ letterSpacing: "-0.01em" }}>
+                <Stack gap="sm">
+                  <Box style={{ minWidth: 0 }}>
+                    <Group gap={8} mb={4} wrap="wrap" align="center">
+                      <Text
+                        fw={700}
+                        style={{
+                          letterSpacing: "-0.01em",
+                          fontSize: isMobile ? 14 : undefined,
+                          wordBreak: "break-word",
+                          flex: "1 1 140px",
+                          minWidth: 0,
+                        }}
+                      >
                         {n.title}
                       </Text>
                       {unread ? (
@@ -190,24 +222,29 @@ export default function NotificacoesPage() {
                         </Badge>
                       )}
                     </Group>
-                    <Text size="sm" c={colors.textSecondary}>
+                    <Text
+                      size="sm"
+                      c={colors.textSecondary}
+                      style={{ wordBreak: "break-word", whiteSpace: "pre-wrap" }}
+                    >
                       {n.body}
                     </Text>
                     <Text size="xs" c={colors.textMuted} mt={8}>
-                      {formatWhen(n.createdAt)}
+                      {formatWhen(n.createdAt, !!isMobile)}
                     </Text>
                   </Box>
                   {unread ? (
                     <Button
                       size="xs"
                       variant="light"
+                      fullWidth={!!isMobile}
                       loading={busyId === n.id}
                       onClick={() => void markRead(n.id)}
                     >
                       Marcar como lida
                     </Button>
                   ) : null}
-                </Group>
+                </Stack>
               </Card>
             );
           })}

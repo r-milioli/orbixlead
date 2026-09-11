@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ActionIcon,
   Badge,
+  Box,
   Button,
   Card,
   Center,
@@ -21,7 +22,7 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
+import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import {
   Archive,
@@ -43,7 +44,7 @@ import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { api, ApiError } from "@/lib/api";
 import type { Lead, ScrapingResult } from "@/lib/types";
 import { unwrapList, unwrapOne } from "@/lib/unwrap";
-import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 const PAGE_SIZE = 25;
 
@@ -102,6 +103,10 @@ function closedReasonLabel(reason?: string | null) {
 }
 
 export default function LeadsPage() {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
+  const menuWidth = isMobile ? "calc(100vw - 16px)" : 210;
   const [tab, setTab] = useState<string | null>("capturados");
 
   const [rows, setRows] = useState<CapturedLead[]>([]);
@@ -362,9 +367,10 @@ export default function LeadsPage() {
         subtitle="Capture, acompanhe no pipeline e consulte jornadas encerradas."
         actions={
           tab === "capturados" ? (
-            <Group gap="sm">
+            <>
               <Button
                 variant="default"
+                size={isMobile ? "sm" : "md"}
                 leftSection={<SlidersHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
                 onClick={() => {
                   setDraftFilters(appliedFilters);
@@ -375,62 +381,73 @@ export default function LeadsPage() {
                 {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
               </Button>
               <Button
+                size={isMobile ? "sm" : "md"}
                 leftSection={<KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
                 disabled={selected.length === 0}
                 loading={sending}
                 onClick={() => void sendToCrm(selected)}
               >
-                Adicionar ao CRM
-                {selected.length > 0 ? ` (${selected.length})` : ""}
+                {isMobile
+                  ? `CRM${selected.length > 0 ? ` (${selected.length})` : ""}`
+                  : `Adicionar ao CRM${selected.length > 0 ? ` (${selected.length})` : ""}`}
               </Button>
-            </Group>
+            </>
           ) : undefined
         }
       />
 
       <Tabs value={tab} onChange={setTab} mb="md">
-        <Tabs.List>
+        <Tabs.List grow={!!isMobile}>
           <Tabs.Tab value="capturados">Capturados</Tabs.Tab>
           <Tabs.Tab value="pipeline">No pipeline</Tabs.Tab>
           <Tabs.Tab value="encerrados">Encerrados</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="capturados" pt="md">
-          <Group gap="sm" mb="md" wrap="wrap">
-            <TextInput
-              placeholder="Buscar empresa, telefone..."
-              leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
-              value={q}
-              onChange={(e) => setQ(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void loadCaptured(appliedFilters, q);
-              }}
-              style={{ flex: "1 1 260px", maxWidth: 360 }}
-            />
-            <Select
-              placeholder="Temperatura"
-              clearable
-              data={[
-                { value: "quente", label: "Quente" },
-                { value: "morno", label: "Morno" },
-                { value: "frio", label: "Frio" },
-              ]}
-              value={appliedFilters.temperatures[0] ?? null}
-              onChange={(value) => {
-                const next = {
-                  ...appliedFilters,
-                  temperatures: value ? [value as "frio" | "morno" | "quente"] : [],
-                };
-                setAppliedFilters(next);
-                setDraftFilters(next);
-                void loadCaptured(next, q);
-              }}
-              w={160}
-            />
-            <Button variant="subtle" onClick={() => void loadCaptured(appliedFilters, q)}>
-              Buscar
-            </Button>
-          </Group>
+          <Stack gap="sm" mb="md">
+            <Group gap="sm" wrap="wrap" grow={!!isMobile}>
+              <TextInput
+                placeholder="Buscar empresa, telefone..."
+                leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
+                value={q}
+                onChange={(e) => setQ(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void loadCaptured(appliedFilters, q);
+                }}
+                size={isMobile ? "sm" : "md"}
+                style={isMobile ? { flex: "1 1 100%" } : { flex: "1 1 260px", maxWidth: 360 }}
+              />
+              <Select
+                placeholder="Temperatura"
+                clearable
+                data={[
+                  { value: "quente", label: "Quente" },
+                  { value: "morno", label: "Morno" },
+                  { value: "frio", label: "Frio" },
+                ]}
+                value={appliedFilters.temperatures[0] ?? null}
+                onChange={(value) => {
+                  const next = {
+                    ...appliedFilters,
+                    temperatures: value ? [value as "frio" | "morno" | "quente"] : [],
+                  };
+                  setAppliedFilters(next);
+                  setDraftFilters(next);
+                  void loadCaptured(next, q);
+                }}
+                size={isMobile ? "sm" : "md"}
+                w={isMobile ? "100%" : 160}
+                style={isMobile ? { flex: "1 1 100%" } : undefined}
+              />
+              <Button
+                variant="subtle"
+                size={isMobile ? "sm" : "md"}
+                onClick={() => void loadCaptured(appliedFilters, q)}
+              >
+                Buscar
+              </Button>
+            </Group>
+          </Stack>
 
           {loading ? (
             <Center mih={240}>
@@ -442,145 +459,278 @@ export default function LeadsPage() {
               description="Execute uma captura ou ajuste os filtros avançados."
             />
           ) : (
-            <Card padding={0}>
-              <Table.ScrollContainer minWidth={960}>
-                <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
-                  <Table.Thead style={{ background: colors.background }}>
-                    <Table.Tr>
-                      <Table.Th w={44}>
-                        <Checkbox
-                          aria-label="Selecionar página"
-                          checked={allPageSelected}
-                          indeterminate={somePageSelected}
-                          onChange={(e) => toggleAllPage(e.currentTarget.checked)}
-                        />
-                      </Table.Th>
-                      <Table.Th>Empresa</Table.Th>
-                      <Table.Th>Cidade</Table.Th>
-                      <Table.Th>Temperatura</Table.Th>
-                      <Table.Th>Avaliações</Table.Th>
-                      <Table.Th>Telefone</Table.Th>
-                      <Table.Th>Site</Table.Th>
-                      <Table.Th w={56} ta="center">
-                        Ações
-                      </Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {pageItems.map((lead) => {
-                      const canSelect = !lead.leadId && !lead.isDuplicate && Boolean(lead.phoneE164);
-                      return (
-                        <Table.Tr
-                          key={lead.id}
-                          bg={selected.includes(lead.id) ? colors.primaryLight : undefined}
-                        >
-                          <Table.Td>
+            <Card padding={isMobile ? "sm" : 0} style={{ minWidth: 0 }}>
+              {isMobile ? (
+                <Stack gap={10}>
+                  <Group gap="sm" wrap="nowrap">
+                    <Checkbox
+                      aria-label="Selecionar página"
+                      checked={allPageSelected}
+                      indeterminate={somePageSelected}
+                      onChange={(e) => toggleAllPage(e.currentTarget.checked)}
+                    />
+                    <Text size="sm" c={colors.textMuted}>
+                      Selecionar página
+                    </Text>
+                  </Group>
+                  {pageItems.map((lead) => {
+                    const canSelect = !lead.leadId && !lead.isDuplicate && Boolean(lead.phoneE164);
+                    return (
+                      <Box
+                        key={lead.id}
+                        style={{
+                          border: `1px solid ${colors.borderLight}`,
+                          borderRadius: 10,
+                          padding: 12,
+                          background: selected.includes(lead.id)
+                            ? colors.primaryLight
+                            : colors.surface,
+                          minWidth: 0,
+                        }}
+                      >
+                        <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm" mb={8}>
+                          <Group gap={8} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
                             <Checkbox
                               aria-label={`Selecionar ${lead.companyName}`}
                               checked={selected.includes(lead.id)}
                               disabled={!canSelect}
                               onChange={(e) => toggleOne(lead.id, e.currentTarget.checked)}
+                              mt={2}
                             />
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm" fw={600}>
-                              {lead.companyName}
-                            </Text>
-                            <Text size="xs" c={colors.textMuted}>
-                              {lead.segment || "—"}
-                              {lead.leadId ? " · já no CRM" : ""}
-                              {lead.isDuplicate ? " · duplicado" : ""}
-                            </Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm">{lead.city || "—"}</Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <TemperatureBadge value={lead.temperature} />
-                          </Table.Td>
-                          <Table.Td>
-                            <Stars rating={lead.rating} />
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm">{lead.phoneE164 || lead.phoneRaw || "—"}</Text>
-                          </Table.Td>
-                          <Table.Td>
-                            {lead.hasWebsite || lead.website ? (
-                              <Text size="sm" c={colors.textSecondary}>
-                                Disponível
+                            <Box style={{ minWidth: 0 }}>
+                              <Text size="sm" fw={600} lineClamp={2}>
+                                {lead.companyName}
                               </Text>
-                            ) : (
-                              <Badge
-                                variant="light"
-                                styles={{
-                                  root: {
-                                    background: colors.dangerBg,
-                                    color: colors.danger,
-                                  },
-                                }}
-                              >
-                                Sem site
-                              </Badge>
-                            )}
-                          </Table.Td>
-                          <Table.Td>
-                            <Menu shadow="md" width={210} position="bottom-end" withinPortal>
-                              <Menu.Target>
-                                <ActionIcon variant="subtle" color="gray" aria-label="Ações">
-                                  <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                                </ActionIcon>
-                              </Menu.Target>
-                              <Menu.Dropdown>
-                                {lead.mapsUrl ? (
-                                  <Menu.Item
-                                    component="a"
-                                    href={lead.mapsUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    leftSection={
-                                      <MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                                    }
-                                  >
-                                    Abrir no Maps
-                                  </Menu.Item>
-                                ) : null}
-                                {canSelect ? (
-                                  <Menu.Item
-                                    leftSection={
-                                      <KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                                    }
-                                    onClick={() => void sendToCrm([lead.id])}
-                                  >
-                                    Adicionar ao CRM
-                                  </Menu.Item>
-                                ) : null}
-                                {(lead.mapsUrl || canSelect) && <Menu.Divider />}
+                              <Text size="xs" c={colors.textMuted} lineClamp={1}>
+                                {lead.segment || "—"}
+                                {lead.leadId ? " · já no CRM" : ""}
+                                {lead.isDuplicate ? " · duplicado" : ""}
+                              </Text>
+                            </Box>
+                          </Group>
+                          <Menu
+                            shadow="md"
+                            width={menuWidth}
+                            position="bottom-end"
+                            withinPortal
+                          >
+                            <Menu.Target>
+                              <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                                <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              {lead.mapsUrl ? (
                                 <Menu.Item
-                                  color="red"
-                                  leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                                  onClick={() =>
-                                    setPendingDelete({ id: lead.id, name: lead.companyName })
+                                  component="a"
+                                  href={lead.mapsUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  leftSection={
+                                    <MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />
                                   }
                                 >
-                                  Excluir
+                                  Abrir no Maps
                                 </Menu.Item>
-                              </Menu.Dropdown>
-                            </Menu>
-                          </Table.Td>
-                        </Table.Tr>
-                      );
-                    })}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
+                              ) : null}
+                              {canSelect ? (
+                                <Menu.Item
+                                  leftSection={
+                                    <KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                  }
+                                  onClick={() => void sendToCrm([lead.id])}
+                                >
+                                  Adicionar ao CRM
+                                </Menu.Item>
+                              ) : null}
+                              {(lead.mapsUrl || canSelect) && <Menu.Divider />}
+                              <Menu.Item
+                                color="red"
+                                leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                onClick={() =>
+                                  setPendingDelete({ id: lead.id, name: lead.companyName })
+                                }
+                              >
+                                Excluir
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Group>
+
+                        <Group gap={8} wrap="wrap" mb={8}>
+                          <TemperatureBadge value={lead.temperature} />
+                          <Stars rating={lead.rating} />
+                          {lead.hasWebsite || lead.website ? (
+                            <Text size="xs" c={colors.textSecondary}>
+                              Com site
+                            </Text>
+                          ) : (
+                            <Badge
+                              size="sm"
+                              variant="light"
+                              styles={{
+                                root: {
+                                  background: colors.dangerBg,
+                                  color: colors.danger,
+                                },
+                              }}
+                            >
+                              Sem site
+                            </Badge>
+                          )}
+                        </Group>
+
+                        <Text size="sm">{lead.phoneE164 || lead.phoneRaw || "—"}</Text>
+                        <Text size="xs" c={colors.textMuted} mt={2}>
+                          {lead.city || "—"}
+                        </Text>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <Table.ScrollContainer minWidth={960}>
+                  <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
+                    <Table.Thead style={{ background: colors.background }}>
+                      <Table.Tr>
+                        <Table.Th w={44}>
+                          <Checkbox
+                            aria-label="Selecionar página"
+                            checked={allPageSelected}
+                            indeterminate={somePageSelected}
+                            onChange={(e) => toggleAllPage(e.currentTarget.checked)}
+                          />
+                        </Table.Th>
+                        <Table.Th>Empresa</Table.Th>
+                        <Table.Th>Cidade</Table.Th>
+                        <Table.Th>Temperatura</Table.Th>
+                        <Table.Th>Avaliações</Table.Th>
+                        <Table.Th>Telefone</Table.Th>
+                        <Table.Th>Site</Table.Th>
+                        <Table.Th w={56} ta="center">
+                          Ações
+                        </Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {pageItems.map((lead) => {
+                        const canSelect = !lead.leadId && !lead.isDuplicate && Boolean(lead.phoneE164);
+                        return (
+                          <Table.Tr
+                            key={lead.id}
+                            bg={selected.includes(lead.id) ? colors.primaryLight : undefined}
+                          >
+                            <Table.Td>
+                              <Checkbox
+                                aria-label={`Selecionar ${lead.companyName}`}
+                                checked={selected.includes(lead.id)}
+                                disabled={!canSelect}
+                                onChange={(e) => toggleOne(lead.id, e.currentTarget.checked)}
+                              />
+                            </Table.Td>
+                            <Table.Td>
+                              <Text size="sm" fw={600}>
+                                {lead.companyName}
+                              </Text>
+                              <Text size="xs" c={colors.textMuted}>
+                                {lead.segment || "—"}
+                                {lead.leadId ? " · já no CRM" : ""}
+                                {lead.isDuplicate ? " · duplicado" : ""}
+                              </Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <Text size="sm">{lead.city || "—"}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                              <TemperatureBadge value={lead.temperature} />
+                            </Table.Td>
+                            <Table.Td>
+                              <Stars rating={lead.rating} />
+                            </Table.Td>
+                            <Table.Td>
+                              <Text size="sm">{lead.phoneE164 || lead.phoneRaw || "—"}</Text>
+                            </Table.Td>
+                            <Table.Td>
+                              {lead.hasWebsite || lead.website ? (
+                                <Text size="sm" c={colors.textSecondary}>
+                                  Disponível
+                                </Text>
+                              ) : (
+                                <Badge
+                                  variant="light"
+                                  styles={{
+                                    root: {
+                                      background: colors.dangerBg,
+                                      color: colors.danger,
+                                    },
+                                  }}
+                                >
+                                  Sem site
+                                </Badge>
+                              )}
+                            </Table.Td>
+                            <Table.Td>
+                              <Menu shadow="md" width={210} position="bottom-end" withinPortal>
+                                <Menu.Target>
+                                  <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                                    <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                  </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                  {lead.mapsUrl ? (
+                                    <Menu.Item
+                                      component="a"
+                                      href={lead.mapsUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      leftSection={
+                                        <MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                      }
+                                    >
+                                      Abrir no Maps
+                                    </Menu.Item>
+                                  ) : null}
+                                  {canSelect ? (
+                                    <Menu.Item
+                                      leftSection={
+                                        <KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                      }
+                                      onClick={() => void sendToCrm([lead.id])}
+                                    >
+                                      Adicionar ao CRM
+                                    </Menu.Item>
+                                  ) : null}
+                                  {(lead.mapsUrl || canSelect) && <Menu.Divider />}
+                                  <Menu.Item
+                                    color="red"
+                                    leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                    onClick={() =>
+                                      setPendingDelete({ id: lead.id, name: lead.companyName })
+                                    }
+                                  >
+                                    Excluir
+                                  </Menu.Item>
+                                </Menu.Dropdown>
+                              </Menu>
+                            </Table.Td>
+                          </Table.Tr>
+                        );
+                      })}
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
+              )}
 
               <Group
                 justify="space-between"
-                px="md"
+                px={isMobile ? 0 : "md"}
                 py="md"
+                mt={isMobile ? "sm" : 0}
+                wrap="wrap"
+                gap="sm"
                 style={{ borderTop: `1px solid ${colors.borderLight}` }}
               >
-                <Text size="sm" c={colors.textMuted}>
+                <Text size="sm" c={colors.textMuted} style={{ flex: "1 1 160px" }}>
                   {rangeLabel}
                   {selected.length > 0 ? ` · ${selected.length} selecionado(s)` : ""}
                   {selectableIds.length > 0 ? ` · ${selectableIds.length} disponíveis` : ""}
@@ -592,7 +742,7 @@ export default function LeadsPage() {
                   size="sm"
                   radius="sm"
                   color="orbix"
-                  withEdges
+                  withEdges={!isMobile}
                 />
               </Group>
             </Card>
@@ -600,7 +750,7 @@ export default function LeadsPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="pipeline" pt="md">
-          <Group gap="sm" mb="md" wrap="wrap">
+          <Group gap="sm" mb="md" wrap="wrap" grow={!!isMobile}>
             <TextInput
               placeholder="Buscar no pipeline..."
               leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
@@ -609,9 +759,14 @@ export default function LeadsPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void loadCrm("open", crmQ);
               }}
-              style={{ flex: "1 1 260px", maxWidth: 360 }}
+              size={isMobile ? "sm" : "md"}
+              style={isMobile ? { flex: "1 1 100%" } : { flex: "1 1 260px", maxWidth: 360 }}
             />
-            <Button variant="subtle" onClick={() => void loadCrm("open", crmQ)}>
+            <Button
+              variant="subtle"
+              size={isMobile ? "sm" : "md"}
+              onClick={() => void loadCrm("open", crmQ)}
+            >
               Buscar
             </Button>
           </Group>
@@ -626,107 +781,198 @@ export default function LeadsPage() {
               description="Envie resultados da captura para o CRM para acompanhá-los aqui."
             />
           ) : (
-            <Card padding={0}>
-              <Table.ScrollContainer minWidth={900}>
-                <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
-                  <Table.Thead style={{ background: colors.background }}>
-                    <Table.Tr>
-                      <Table.Th>Empresa</Table.Th>
-                      <Table.Th>Estágio</Table.Th>
-                      <Table.Th>Cidade</Table.Th>
-                      <Table.Th>Temperatura</Table.Th>
-                      <Table.Th>Telefone</Table.Th>
-                      <Table.Th>Segmento</Table.Th>
-                      <Table.Th w={56} ta="center">
-                        Ações
-                      </Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {crmPageItems.map((lead) => (
-                      <Table.Tr key={lead.id}>
-                        <Table.Td>
-                          <Text size="sm" fw={600}>
+            <Card padding={isMobile ? "sm" : 0} style={{ minWidth: 0 }}>
+              {isMobile ? (
+                <Stack gap={10}>
+                  {crmPageItems.map((lead) => (
+                    <Box
+                      key={lead.id}
+                      style={{
+                        border: `1px solid ${colors.borderLight}`,
+                        borderRadius: 10,
+                        padding: 12,
+                        background: colors.surface,
+                        minWidth: 0,
+                      }}
+                    >
+                      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm" mb={8}>
+                        <Box style={{ minWidth: 0, flex: 1 }}>
+                          <Text size="sm" fw={600} lineClamp={2}>
                             {lead.companyName}
                           </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge variant="light" color="orbix">
-                            {lead.stage?.label || "—"}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{lead.city || "—"}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <TemperatureBadge value={lead.temperature} />
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{lead.phoneE164}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" c={colors.textSecondary}>
+                          <Text size="xs" c={colors.textMuted} mt={2} lineClamp={1}>
                             {lead.segment || "—"}
                           </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Menu shadow="md" width={220} position="bottom-end" withinPortal>
-                            <Menu.Target>
-                              <ActionIcon variant="subtle" color="gray" aria-label="Ações">
-                                <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                component={Link}
-                                href={`/crm/leads/${lead.id}`}
-                                leftSection={
-                                  <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                                }
-                              >
-                                Abrir ficha
-                              </Menu.Item>
-                              <Menu.Divider />
-                              <Menu.Item
-                                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                                onClick={() =>
-                                  setPendingClose({
-                                    id: lead.id,
-                                    name: lead.companyName,
-                                    reason: "converted",
-                                  })
-                                }
-                              >
-                                Encerrar como convertido
-                              </Menu.Item>
-                              <Menu.Item
-                                color="red"
-                                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                                onClick={() =>
-                                  setPendingClose({
-                                    id: lead.id,
-                                    name: lead.companyName,
-                                    reason: "lost",
-                                  })
-                                }
-                              >
-                                Encerrar como perdido
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Table.Td>
+                        </Box>
+                        <Menu
+                          shadow="md"
+                          width={isMobile ? "calc(100vw - 16px)" : 220}
+                          position="bottom-end"
+                          withinPortal
+                        >
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                              <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item
+                              component={Link}
+                              href={`/crm/leads/${lead.id}`}
+                              leftSection={
+                                <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                              }
+                            >
+                              Abrir ficha
+                            </Menu.Item>
+                            <Menu.Divider />
+                            <Menu.Item
+                              leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                              onClick={() =>
+                                setPendingClose({
+                                  id: lead.id,
+                                  name: lead.companyName,
+                                  reason: "converted",
+                                })
+                              }
+                            >
+                              Encerrar como convertido
+                            </Menu.Item>
+                            <Menu.Item
+                              color="red"
+                              leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                              onClick={() =>
+                                setPendingClose({
+                                  id: lead.id,
+                                  name: lead.companyName,
+                                  reason: "lost",
+                                })
+                              }
+                            >
+                              Encerrar como perdido
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+
+                      <Group gap={8} wrap="wrap" mb={8}>
+                        <Badge variant="light" color="orbix">
+                          {lead.stage?.label || "—"}
+                        </Badge>
+                        <TemperatureBadge value={lead.temperature} />
+                      </Group>
+                      <Text size="sm">{lead.phoneE164 || "—"}</Text>
+                      <Text size="xs" c={colors.textMuted} mt={2}>
+                        {lead.city || "—"}
+                      </Text>
+                    </Box>
+                  ))}
+                </Stack>
+              ) : (
+                <Table.ScrollContainer minWidth={900}>
+                  <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
+                    <Table.Thead style={{ background: colors.background }}>
+                      <Table.Tr>
+                        <Table.Th>Empresa</Table.Th>
+                        <Table.Th>Estágio</Table.Th>
+                        <Table.Th>Cidade</Table.Th>
+                        <Table.Th>Temperatura</Table.Th>
+                        <Table.Th>Telefone</Table.Th>
+                        <Table.Th>Segmento</Table.Th>
+                        <Table.Th w={56} ta="center">
+                          Ações
+                        </Table.Th>
                       </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {crmPageItems.map((lead) => (
+                        <Table.Tr key={lead.id}>
+                          <Table.Td>
+                            <Text size="sm" fw={600}>
+                              {lead.companyName}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge variant="light" color="orbix">
+                              {lead.stage?.label || "—"}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">{lead.city || "—"}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <TemperatureBadge value={lead.temperature} />
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">{lead.phoneE164}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm" c={colors.textSecondary}>
+                              {lead.segment || "—"}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Menu shadow="md" width={220} position="bottom-end" withinPortal>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                                  <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item
+                                  component={Link}
+                                  href={`/crm/leads/${lead.id}`}
+                                  leftSection={
+                                    <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                  }
+                                >
+                                  Abrir ficha
+                                </Menu.Item>
+                                <Menu.Divider />
+                                <Menu.Item
+                                  leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                  onClick={() =>
+                                    setPendingClose({
+                                      id: lead.id,
+                                      name: lead.companyName,
+                                      reason: "converted",
+                                    })
+                                  }
+                                >
+                                  Encerrar como convertido
+                                </Menu.Item>
+                                <Menu.Item
+                                  color="red"
+                                  leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                  onClick={() =>
+                                    setPendingClose({
+                                      id: lead.id,
+                                      name: lead.companyName,
+                                      reason: "lost",
+                                    })
+                                  }
+                                >
+                                  Encerrar como perdido
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
+              )}
               <Group
                 justify="space-between"
-                px="md"
+                px={isMobile ? 0 : "md"}
                 py="md"
+                mt={isMobile ? "sm" : 0}
+                wrap="wrap"
+                gap="sm"
                 style={{ borderTop: `1px solid ${colors.borderLight}` }}
               >
-                <Text size="sm" c={colors.textMuted}>
+                <Text size="sm" c={colors.textMuted} style={{ flex: "1 1 160px" }}>
                   {crmRangeLabel}
                 </Text>
                 <Pagination
@@ -736,7 +982,7 @@ export default function LeadsPage() {
                   size="sm"
                   radius="sm"
                   color="orbix"
-                  withEdges
+                  withEdges={!isMobile}
                 />
               </Group>
             </Card>
@@ -744,7 +990,7 @@ export default function LeadsPage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="encerrados" pt="md">
-          <Group gap="sm" mb="md" wrap="wrap">
+          <Group gap="sm" mb="md" wrap="wrap" grow={!!isMobile}>
             <TextInput
               placeholder="Buscar encerrados..."
               leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
@@ -753,9 +999,14 @@ export default function LeadsPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void loadCrm("closed", crmQ);
               }}
-              style={{ flex: "1 1 260px", maxWidth: 360 }}
+              size={isMobile ? "sm" : "md"}
+              style={isMobile ? { flex: "1 1 100%" } : { flex: "1 1 260px", maxWidth: 360 }}
             />
-            <Button variant="subtle" onClick={() => void loadCrm("closed", crmQ)}>
+            <Button
+              variant="subtle"
+              size={isMobile ? "sm" : "md"}
+              onClick={() => void loadCrm("closed", crmQ)}
+            >
               Buscar
             </Button>
           </Group>
@@ -770,99 +1021,182 @@ export default function LeadsPage() {
               description="Ao finalizar a jornada (convertido ou perdido), o lead aparece aqui para consulta."
             />
           ) : (
-            <Card padding={0}>
-              <Table.ScrollContainer minWidth={960}>
-                <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
-                  <Table.Thead style={{ background: colors.background }}>
-                    <Table.Tr>
-                      <Table.Th>Empresa</Table.Th>
-                      <Table.Th>Motivo</Table.Th>
-                      <Table.Th>Encerrado em</Table.Th>
-                      <Table.Th>Cidade</Table.Th>
-                      <Table.Th>Telefone</Table.Th>
-                      <Table.Th>Segmento</Table.Th>
-                      <Table.Th w={56} ta="center">
-                        Ações
-                      </Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {crmPageItems.map((lead) => (
-                      <Table.Tr key={lead.id}>
-                        <Table.Td>
-                          <Text size="sm" fw={600}>
+            <Card padding={isMobile ? "sm" : 0} style={{ minWidth: 0 }}>
+              {isMobile ? (
+                <Stack gap={10}>
+                  {crmPageItems.map((lead) => (
+                    <Box
+                      key={lead.id}
+                      style={{
+                        border: `1px solid ${colors.borderLight}`,
+                        borderRadius: 10,
+                        padding: 12,
+                        background: colors.surface,
+                        minWidth: 0,
+                      }}
+                    >
+                      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm" mb={8}>
+                        <Box style={{ minWidth: 0, flex: 1 }}>
+                          <Text size="sm" fw={600} lineClamp={2}>
                             {lead.companyName}
                           </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge
-                            variant="light"
-                            color={
-                              (lead.closedReason || "").toLowerCase() === "converted"
-                                ? "green"
-                                : "gray"
-                            }
-                          >
-                            {closedReasonLabel(lead.closedReason)}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">
-                            {lead.closedAt
-                              ? dayjs(lead.closedAt).format("DD/MM/YYYY HH:mm")
-                              : "—"}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{lead.city || "—"}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{lead.phoneE164}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" c={colors.textSecondary}>
+                          <Text size="xs" c={colors.textMuted} mt={2} lineClamp={1}>
                             {lead.segment || "—"}
                           </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Menu shadow="md" width={210} position="bottom-end" withinPortal>
-                            <Menu.Target>
-                              <ActionIcon variant="subtle" color="gray" aria-label="Ações">
-                                <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                component={Link}
-                                href={`/crm/leads/${lead.id}`}
-                                leftSection={
-                                  <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                                }
-                              >
-                                Consultar ficha
-                              </Menu.Item>
-                              <Menu.Item
-                                leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                                onClick={() => void reopenLead(lead)}
-                                disabled={reopeningId === lead.id}
-                              >
-                                Reabrir no pipeline
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Table.Td>
+                        </Box>
+                        <Menu
+                          shadow="md"
+                          width={menuWidth}
+                          position="bottom-end"
+                          withinPortal
+                        >
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                              <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item
+                              component={Link}
+                              href={`/crm/leads/${lead.id}`}
+                              leftSection={
+                                <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                              }
+                            >
+                              Consultar ficha
+                            </Menu.Item>
+                            <Menu.Item
+                              leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                              onClick={() => void reopenLead(lead)}
+                              disabled={reopeningId === lead.id}
+                            >
+                              Reabrir no pipeline
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+
+                      <Group gap={8} wrap="wrap" mb={8}>
+                        <Badge
+                          variant="light"
+                          color={
+                            (lead.closedReason || "").toLowerCase() === "converted"
+                              ? "green"
+                              : "gray"
+                          }
+                        >
+                          {closedReasonLabel(lead.closedReason)}
+                        </Badge>
+                        <Text size="xs" c={colors.textMuted}>
+                          {lead.closedAt
+                            ? dayjs(lead.closedAt).format("DD/MM/YY HH:mm")
+                            : "—"}
+                        </Text>
+                      </Group>
+                      <Text size="sm">{lead.phoneE164 || "—"}</Text>
+                      <Text size="xs" c={colors.textMuted} mt={2}>
+                        {lead.city || "—"}
+                      </Text>
+                    </Box>
+                  ))}
+                </Stack>
+              ) : (
+                <Table.ScrollContainer minWidth={960}>
+                  <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
+                    <Table.Thead style={{ background: colors.background }}>
+                      <Table.Tr>
+                        <Table.Th>Empresa</Table.Th>
+                        <Table.Th>Motivo</Table.Th>
+                        <Table.Th>Encerrado em</Table.Th>
+                        <Table.Th>Cidade</Table.Th>
+                        <Table.Th>Telefone</Table.Th>
+                        <Table.Th>Segmento</Table.Th>
+                        <Table.Th w={56} ta="center">
+                          Ações
+                        </Table.Th>
                       </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {crmPageItems.map((lead) => (
+                        <Table.Tr key={lead.id}>
+                          <Table.Td>
+                            <Text size="sm" fw={600}>
+                              {lead.companyName}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge
+                              variant="light"
+                              color={
+                                (lead.closedReason || "").toLowerCase() === "converted"
+                                  ? "green"
+                                  : "gray"
+                              }
+                            >
+                              {closedReasonLabel(lead.closedReason)}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">
+                              {lead.closedAt
+                                ? dayjs(lead.closedAt).format("DD/MM/YYYY HH:mm")
+                                : "—"}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">{lead.city || "—"}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">{lead.phoneE164}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm" c={colors.textSecondary}>
+                              {lead.segment || "—"}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Menu shadow="md" width={210} position="bottom-end" withinPortal>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                                  <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item
+                                  component={Link}
+                                  href={`/crm/leads/${lead.id}`}
+                                  leftSection={
+                                    <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                  }
+                                >
+                                  Consultar ficha
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                  onClick={() => void reopenLead(lead)}
+                                  disabled={reopeningId === lead.id}
+                                >
+                                  Reabrir no pipeline
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                </Table.ScrollContainer>
+              )}
               <Group
                 justify="space-between"
-                px="md"
+                px={isMobile ? 0 : "md"}
                 py="md"
+                mt={isMobile ? "sm" : 0}
+                wrap="wrap"
+                gap="sm"
                 style={{ borderTop: `1px solid ${colors.borderLight}` }}
               >
-                <Text size="sm" c={colors.textMuted}>
+                <Text size="sm" c={colors.textMuted} style={{ flex: "1 1 160px" }}>
                   {crmRangeLabel}
                 </Text>
                 <Pagination
@@ -872,7 +1206,7 @@ export default function LeadsPage() {
                   size="sm"
                   radius="sm"
                   color="orbix"
-                  withEdges
+                  withEdges={!isMobile}
                 />
               </Group>
             </Card>
@@ -884,7 +1218,7 @@ export default function LeadsPage() {
         opened={filtersOpen}
         onClose={closeFilters}
         position="right"
-        size={420}
+        size={isMobile ? "100%" : 420}
         title="Filtros avançados"
         padding="md"
         overlayProps={{ backgroundOpacity: 0.45 }}
@@ -894,7 +1228,7 @@ export default function LeadsPage() {
             <Text size="sm" fw={600} mb={8}>
               Temperatura
             </Text>
-            <Group gap="md">
+            <Group gap="md" wrap="wrap">
               {(["frio", "morno", "quente"] as const).map((temp) => (
                 <Checkbox
                   key={temp}
@@ -976,7 +1310,7 @@ export default function LeadsPage() {
             }
           />
 
-          <Group justify="space-between" mt="md">
+          <Group justify="space-between" mt="md" grow={!!isMobile} wrap="wrap">
             <Button variant="subtle" onClick={clearFilters}>
               Limpar filtros
             </Button>

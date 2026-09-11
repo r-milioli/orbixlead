@@ -10,11 +10,12 @@ import {
   Textarea,
   Group,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { applyTemplate, buildWhatsAppUrl } from "@orbixlead/shared";
 import { api } from "@/lib/api";
 import type { MessageTemplate } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
-import { colors } from "@/theme/tokens";
+import { colors, layout } from "@/theme/tokens";
 
 type Props = {
   opened: boolean;
@@ -31,6 +32,9 @@ export function WhatsAppModal({
   companyName,
   contactName,
 }: Props) {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -83,7 +87,14 @@ export function WhatsAppModal({
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Enviar WhatsApp" size="md">
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Enviar WhatsApp"
+      size="md"
+      centered
+      fullScreen={!!isMobile}
+    >
       <Stack gap="md">
         <Select
           label="Template"
@@ -95,14 +106,14 @@ export function WhatsAppModal({
         />
         <Textarea
           label="Mensagem"
-          minRows={5}
+          minRows={isMobile ? 6 : 5}
           value={message}
           onChange={(e) => setMessage(e.currentTarget.value)}
         />
         <Text size="xs" c={colors.textMuted}>
           Variáveis: {"{nome}"} {"{empresa}"}
         </Text>
-        <Group justify="flex-end">
+        <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} wrap="wrap">
           <Button variant="default" onClick={onClose}>
             Cancelar
           </Button>

@@ -21,6 +21,7 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { goalMetrics } from "@orbixlead/shared";
 import { Pencil, Plus, Target, Trash2 } from "lucide-react";
@@ -31,7 +32,7 @@ import { useAuth } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import type { Goal } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
-import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 type MonthTab = "current" | "past" | "next";
 
@@ -86,11 +87,13 @@ function GoalAccordionItem({
   isAdmin,
   onEdit,
   onDelete,
+  compact = false,
 }: {
   goal: Goal;
   isAdmin: boolean;
   onEdit: (g: Goal) => void;
   onDelete: (g: Goal) => void;
+  compact?: boolean;
 }) {
   const target = goal.targetConversions;
   const current = goal.convertedCount ?? 0;
@@ -113,13 +116,13 @@ function GoalAccordionItem({
   return (
     <Accordion.Item value={goal.id}>
       <Group gap={0} wrap="nowrap" align="stretch">
-        <Accordion.Control style={{ flex: 1 }}>
-          <Group justify="space-between" wrap="nowrap" gap="md">
+        <Accordion.Control style={{ flex: 1, minWidth: 0 }}>
+          <Group justify="space-between" wrap="nowrap" gap={compact ? "xs" : "md"}>
             <Box style={{ minWidth: 0, flex: 1 }}>
-              <Text fw={700} lineClamp={1} style={{ letterSpacing: "-0.01em" }}>
+              <Text fw={700} lineClamp={2} style={{ letterSpacing: "-0.01em", fontSize: compact ? 14 : undefined }}>
                 {goal.name}
               </Text>
-              <Group gap={6} mt={6}>
+              <Group gap={6} mt={6} wrap="wrap">
                 <Badge size="sm" variant="light" color="gray">
                   {periodBadge(goal)}
                 </Badge>
@@ -132,6 +135,11 @@ function GoalAccordionItem({
                   </Badge>
                 ) : null}
               </Group>
+              {compact ? (
+                <Text size="xs" c={colors.textMuted} mt={6}>
+                  {current}/{target} · {pct}% · faltam {remaining}
+                </Text>
+              ) : null}
             </Box>
             <Box ta="right" visibleFrom="sm" style={{ flexShrink: 0 }}>
               <Text size="sm" fw={700}>
@@ -145,7 +153,13 @@ function GoalAccordionItem({
         </Accordion.Control>
 
         {isAdmin ? (
-          <Group gap={4} px="sm" style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+          <Group
+            gap={4}
+            px={compact ? 4 : "sm"}
+            visibleFrom="sm"
+            style={{ flexShrink: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <ActionIcon
               variant="subtle"
               color="gray"
@@ -169,7 +183,7 @@ function GoalAccordionItem({
       <Accordion.Panel>
         <Stack gap="md">
           {isAdmin ? (
-            <Group gap="xs">
+            <Group gap="xs" grow={compact} wrap="wrap">
               <Button
                 size="xs"
                 variant="light"
@@ -191,24 +205,28 @@ function GoalAccordionItem({
           ) : null}
 
           <Progress value={pct} color="orbix" size="md" radius="xl" />
-          <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
-            <Box>
+          <SimpleGrid cols={{ base: 2, sm: 3 }} spacing={compact ? 8 : "sm"}>
+            <Box style={{ minWidth: 0 }}>
               <Text size="xs" c={colors.textMuted}>
                 Realizado
               </Text>
-              <Text fw={700}>
+              <Text fw={700} style={{ wordBreak: "break-word" }}>
                 {current} / {target}
               </Text>
             </Box>
-            <Box>
+            <Box style={{ minWidth: 0 }}>
               <Text size="xs" c={colors.textMuted}>
                 Falta atingir
               </Text>
-              <Text fw={700} c={remaining === 0 ? colors.success : colors.warning}>
+              <Text
+                fw={700}
+                c={remaining === 0 ? colors.success : colors.warning}
+                style={{ wordBreak: "break-word", fontSize: compact ? 13 : undefined }}
+              >
                 {remaining} convers{remaining === 1 ? "ão" : "ões"}
               </Text>
             </Box>
-            <Box>
+            <Box style={{ minWidth: 0 }}>
               <Text size="xs" c={colors.textMuted}>
                 Progresso
               </Text>
@@ -216,25 +234,29 @@ function GoalAccordionItem({
                 {pct}%
               </Text>
             </Box>
-            <Box>
+            <Box style={{ minWidth: 0 }}>
               <Text size="xs" c={colors.textMuted}>
                 Faturamento previsto
               </Text>
-              <Text fw={600}>{money(predicted.faturamento)}</Text>
+              <Text fw={600} style={{ wordBreak: "break-word", fontSize: compact ? 13 : undefined }}>
+                {money(predicted.faturamento)}
+              </Text>
             </Box>
-            <Box>
+            <Box style={{ minWidth: 0 }}>
               <Text size="xs" c={colors.textMuted}>
                 Lucro previsto
               </Text>
-              <Text fw={600}>
+              <Text fw={600} style={{ wordBreak: "break-word", fontSize: compact ? 13 : undefined }}>
                 {money(predicted.lucro)} ({(predicted.lucroPercent * 100).toFixed(0)}%)
               </Text>
             </Box>
-            <Box>
+            <Box style={{ minWidth: 0 }}>
               <Text size="xs" c={colors.textMuted}>
                 Já realizado
               </Text>
-              <Text fw={600}>{money(realized.faturamento)}</Text>
+              <Text fw={600} style={{ wordBreak: "break-word", fontSize: compact ? 13 : undefined }}>
+                {money(realized.faturamento)}
+              </Text>
             </Box>
           </SimpleGrid>
 
@@ -247,7 +269,7 @@ function GoalAccordionItem({
                 variant="separated"
                 radius="md"
                 multiple={false}
-                styles={accordionStyles}
+                styles={accordionStyles(compact)}
               >
                 {children.map((child) => (
                   <GoalAccordionItem
@@ -256,6 +278,7 @@ function GoalAccordionItem({
                     isAdmin={isAdmin}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    compact={compact}
                   />
                 ))}
               </Accordion>
@@ -267,7 +290,7 @@ function GoalAccordionItem({
   );
 }
 
-const accordionStyles = {
+const accordionStyles = (compact = false) => ({
   item: {
     backgroundColor: colors.surface,
     border: `1px solid ${colors.border}`,
@@ -276,10 +299,10 @@ const accordionStyles = {
     boxShadow: "0 1px 2px rgba(0,0,0,.04)",
   },
   control: {
-    paddingTop: 14,
-    paddingBottom: 14,
-    paddingLeft: 12,
-    paddingRight: 12,
+    paddingTop: compact ? 10 : 14,
+    paddingBottom: compact ? 10 : 14,
+    paddingLeft: compact ? 8 : 12,
+    paddingRight: compact ? 8 : 12,
     "&:hover": {
       backgroundColor: colors.surfaceHover,
     },
@@ -289,13 +312,18 @@ const accordionStyles = {
     borderTop: `1px solid ${colors.borderLight}`,
   },
   content: {
-    paddingTop: 14,
-    paddingBottom: 14,
+    paddingTop: compact ? 10 : 14,
+    paddingBottom: compact ? 10 : 14,
+    paddingLeft: compact ? 8 : undefined,
+    paddingRight: compact ? 8 : undefined,
   },
-};
+});
 
 export default function MetasPage() {
   const { tenant, isAdmin, isOperador, user } = useAuth();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [goals, setGoals] = useState<Goal[]>([]);
   const [operators, setOperators] = useState<OperatorOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -580,17 +608,22 @@ export default function MetasPage() {
     <>
       <PageHeader
         title="Metas"
-        subtitle="Acompanhe metas mensais e desdobramentos semanais/diários."
+        subtitle={
+          isMobile
+            ? "Metas mensais e desdobramentos"
+            : "Acompanhe metas mensais e desdobramentos semanais/diários."
+        }
         actions={
           isAdmin ? (
             <Button
+              size={isMobile ? "sm" : "md"}
               leftSection={<Plus size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
               onClick={() => {
                 resetForm();
                 setCreateOpen(true);
               }}
             >
-              Nova meta
+              {isMobile ? "Nova" : "Nova meta"}
             </Button>
           ) : null
         }
@@ -599,9 +632,11 @@ export default function MetasPage() {
       {showGoalSelector ? (
         <Select
           mb="md"
-          maw={360}
+          maw={isMobile ? undefined : 360}
+          w={isMobile ? "100%" : undefined}
           label="Meta em acompanhamento"
           description="Padrão: sua meta pessoal"
+          size={isMobile ? "sm" : "md"}
           data={[
             {
               value: personalRoot!.id,
@@ -623,15 +658,18 @@ export default function MetasPage() {
         color="orbix"
         mb="lg"
       >
-        <Tabs.List>
-          <Tabs.Tab value="current">Mês corrente</Tabs.Tab>
-          <Tabs.Tab value="past">Mês passado</Tabs.Tab>
-          <Tabs.Tab value="next">Mês que vem</Tabs.Tab>
+        <Tabs.List grow={!!isMobile}>
+          <Tabs.Tab value="current">{isMobile ? "Corrente" : "Mês corrente"}</Tabs.Tab>
+          <Tabs.Tab value="past">{isMobile ? "Passado" : "Mês passado"}</Tabs.Tab>
+          <Tabs.Tab value="next">{isMobile ? "Próximo" : "Mês que vem"}</Tabs.Tab>
         </Tabs.List>
       </Tabs>
 
       <Text size="sm" c={colors.textMuted} mb="md">
-        Exibindo metas de <Text span fw={600} c={colors.textSecondary}>{monthLabel(activeMonth)}</Text>
+        Exibindo metas de{" "}
+        <Text span fw={600} c={colors.textSecondary}>
+          {monthLabel(activeMonth)}
+        </Text>
         {" · "}mais recentes primeiro
       </Text>
 
@@ -655,7 +693,7 @@ export default function MetasPage() {
           radius="md"
           multiple
           chevronPosition="left"
-          styles={accordionStyles}
+          styles={accordionStyles(!!isMobile)}
         >
           {visibleRoots.map((goal) => (
             <GoalAccordionItem
@@ -664,6 +702,7 @@ export default function MetasPage() {
               isAdmin={isAdmin}
               onEdit={openEdit}
               onDelete={requestDelete}
+              compact={!!isMobile}
             />
           ))}
         </Accordion>
@@ -675,6 +714,7 @@ export default function MetasPage() {
         title={`Nova meta · ${monthLabel(activeMonth)}`}
         centered
         size="lg"
+        fullScreen={!!isMobile}
       >
         <form onSubmit={onSubmit}>
           <Stack gap="sm">
@@ -683,6 +723,7 @@ export default function MetasPage() {
               required
               value={name}
               onChange={(e) => setName(e.currentTarget.value)}
+              size={isMobile ? "sm" : "md"}
             />
             <Select
               label="Período"
@@ -693,6 +734,7 @@ export default function MetasPage() {
               ]}
               value={periodType}
               onChange={(v) => setPeriodType(v || "monthly")}
+              size={isMobile ? "sm" : "md"}
             />
             {periodType !== "monthly" ? (
               <Select
@@ -704,6 +746,7 @@ export default function MetasPage() {
                 }))}
                 value={parentId}
                 onChange={setParentId}
+                size={isMobile ? "sm" : "md"}
               />
             ) : (
               <>
@@ -718,6 +761,7 @@ export default function MetasPage() {
                     setScope(v || "company");
                     if (v !== "operator") setAssigneeId(null);
                   }}
+                  size={isMobile ? "sm" : "md"}
                 />
                 {scope === "operator" ? (
                   <Select
@@ -728,12 +772,19 @@ export default function MetasPage() {
                     value={assigneeId}
                     onChange={setAssigneeId}
                     placeholder="Selecione o operador"
+                    size={isMobile ? "sm" : "md"}
                   />
                 ) : null}
               </>
             )}
-            <SimpleGrid cols={2}>
-              <NumberInput label="Ano" value={year} onChange={setYear} required />
+            <SimpleGrid cols={{ base: 1, xs: 2 }}>
+              <NumberInput
+                label="Ano"
+                value={year}
+                onChange={setYear}
+                required
+                size={isMobile ? "sm" : "md"}
+              />
               <NumberInput
                 label="Mês"
                 min={1}
@@ -741,6 +792,7 @@ export default function MetasPage() {
                 value={month}
                 onChange={setMonth}
                 required
+                size={isMobile ? "sm" : "md"}
               />
             </SimpleGrid>
             <NumberInput
@@ -749,6 +801,7 @@ export default function MetasPage() {
               value={targetConversions}
               onChange={setTargetConversions}
               required
+              size={isMobile ? "sm" : "md"}
             />
             <NumberInput
               label="Preço de venda (R$)"
@@ -757,6 +810,7 @@ export default function MetasPage() {
               value={precoVenda}
               onChange={setPrecoVenda}
               required
+              size={isMobile ? "sm" : "md"}
             />
             <NumberInput
               label="Custo por conversão (R$)"
@@ -765,6 +819,7 @@ export default function MetasPage() {
               value={custoPorConversao}
               onChange={setCustoPorConversao}
               required
+              size={isMobile ? "sm" : "md"}
             />
             <Card withBorder shadow="none" padding="sm" bg={colors.surfaceSecondary}>
               <Text size="xs" fw={600} mb={6}>
@@ -776,7 +831,7 @@ export default function MetasPage() {
                 Lucro: {money(preview.lucro)} ({(preview.lucroPercent * 100).toFixed(0)}%)
               </Text>
             </Card>
-            <Group justify="flex-end" mt="xs">
+            <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} mt="xs" wrap="wrap">
               <Button variant="default" onClick={() => setCreateOpen(false)}>
                 Cancelar
               </Button>
@@ -798,12 +853,19 @@ export default function MetasPage() {
         confirmLabel="Excluir"
       />
 
-      <Modal opened={editOpen} onClose={() => setEditOpen(false)} title="Editar meta" centered>
+      <Modal
+        opened={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Editar meta"
+        centered
+        fullScreen={!!isMobile}
+      >
         <Stack gap="sm">
           <TextInput
             label="Nome"
             value={editName}
             onChange={(e) => setEditName(e.currentTarget.value)}
+            size={isMobile ? "sm" : "md"}
           />
           {!editing?.parentId ? (
             <>
@@ -818,6 +880,7 @@ export default function MetasPage() {
                   setEditScope(v || "company");
                   if (v !== "operator") setEditAssigneeId(null);
                 }}
+                size={isMobile ? "sm" : "md"}
               />
               {editScope === "operator" ? (
                 <Select
@@ -826,6 +889,7 @@ export default function MetasPage() {
                   data={operators.map((o) => ({ value: o.id, label: o.name }))}
                   value={editAssigneeId}
                   onChange={setEditAssigneeId}
+                  size={isMobile ? "sm" : "md"}
                 />
               ) : null}
             </>
@@ -835,6 +899,7 @@ export default function MetasPage() {
             min={1}
             value={editTarget}
             onChange={setEditTarget}
+            size={isMobile ? "sm" : "md"}
           />
           <NumberInput
             label="Preço de venda (R$)"
@@ -842,6 +907,7 @@ export default function MetasPage() {
             decimalScale={2}
             value={editPreco}
             onChange={setEditPreco}
+            size={isMobile ? "sm" : "md"}
           />
           <NumberInput
             label="Custo por conversão (R$)"
@@ -849,8 +915,9 @@ export default function MetasPage() {
             decimalScale={2}
             value={editCusto}
             onChange={setEditCusto}
+            size={isMobile ? "sm" : "md"}
           />
-          <Group justify="flex-end" mt="sm">
+          <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} mt="sm" wrap="wrap">
             <Button variant="default" onClick={() => setEditOpen(false)}>
               Cancelar
             </Button>
