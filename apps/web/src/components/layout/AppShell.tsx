@@ -45,6 +45,7 @@ import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notifications-events";
 import type { AppNotification } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
+import { ColorSchemeToggle } from "@/components/layout/ColorSchemeToggle";
 import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 type NavItem = {
@@ -529,6 +530,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Group>
 
           <Group gap="sm" style={{ overflow: "visible" }}>
+            <ColorSchemeToggle />
             {user?.role !== "super_admin" ? (
               <Menu width={320} position="bottom-end" withinPortal>
                 <Menu.Target>

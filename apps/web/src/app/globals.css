@@ -1,8 +1,87 @@
+/* Design System — Orbixlead (light padrão do DS; dark coerente com o mesmo produto) */
+:root,
+[data-mantine-color-scheme="light"] {
+  --orbix-primary: #15aabf;
+  --orbix-primary-hover: #1098ad;
+  --orbix-primary-dark: #0c8599;
+  --orbix-primary-light: #e3fafc;
+
+  --orbix-bg: #f8f9fa;
+  --orbix-surface: #ffffff;
+  --orbix-surface-secondary: #f1f3f5;
+  --orbix-surface-hover: #f8f9fa;
+
+  --orbix-text: #212529;
+  --orbix-text-secondary: #495057;
+  --orbix-text-muted: #868e96;
+  --orbix-text-disabled: #adb5bd;
+
+  --orbix-border: #dee2e6;
+  --orbix-border-light: #e9ecef;
+
+  --orbix-success: #2f9e44;
+  --orbix-success-bg: #ebfbee;
+  --orbix-warning: #f08c00;
+  --orbix-warning-bg: #fff4e6;
+  --orbix-danger: #e03131;
+  --orbix-danger-bg: #fff5f5;
+
+  --orbix-scrollbar: #ced4da;
+  --orbix-scrollbar-hover: #868e96;
+}
+
+[data-mantine-color-scheme="dark"] {
+  --orbix-primary: #15aabf;
+  --orbix-primary-hover: #3bc9db;
+  --orbix-primary-dark: #66d9e8;
+  --orbix-primary-light: rgba(21, 170, 191, 0.16);
+
+  --orbix-bg: #141517;
+  --orbix-surface: #1a1b1e;
+  --orbix-surface-secondary: #25262b;
+  --orbix-surface-hover: #2c2e33;
+
+  --orbix-text: #f8f9fa;
+  --orbix-text-secondary: #c1c2c5;
+  --orbix-text-muted: #909296;
+  --orbix-text-disabled: #5c5f66;
+
+  --orbix-border: #373a40;
+  --orbix-border-light: #2c2e33;
+
+  --orbix-success: #51cf66;
+  --orbix-success-bg: rgba(47, 158, 68, 0.18);
+  --orbix-warning: #ffa94d;
+  --orbix-warning-bg: rgba(240, 140, 0, 0.18);
+  --orbix-danger: #ff6b6b;
+  --orbix-danger-bg: rgba(224, 49, 49, 0.18);
+
+  --orbix-scrollbar: #495057;
+  --orbix-scrollbar-hover: #868e96;
+
+  /* Alinha body/paper do Mantine ao surface do DS */
+  --mantine-color-body: var(--orbix-bg);
+  --mantine-color-default: var(--orbix-surface);
+  --mantine-color-default-hover: var(--orbix-surface-hover);
+  --mantine-color-default-border: var(--orbix-border);
+  --mantine-color-text: var(--orbix-text);
+  --mantine-color-dimmed: var(--orbix-text-muted);
+}
+
+[data-mantine-color-scheme="light"] {
+  --mantine-color-body: var(--orbix-bg);
+  --mantine-color-default: var(--orbix-surface);
+  --mantine-color-default-hover: var(--orbix-surface-hover);
+  --mantine-color-default-border: var(--orbix-border-light);
+  --mantine-color-text: var(--orbix-text);
+  --mantine-color-dimmed: var(--orbix-text-muted);
+}
+
 body {
   margin: 0;
   padding: 0;
-  background: #f8f9fa;
-  color: #212529;
+  background: var(--orbix-bg);
+  color: var(--orbix-text);
   min-height: 100%;
   font-size: 14px;
   font-weight: 400;
@@ -39,15 +118,15 @@ a {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #ced4da;
+  background: var(--orbix-scrollbar);
   border-radius: 999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #868e96;
+  background: var(--orbix-scrollbar-hover);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #ced4da transparent;
+  scrollbar-color: var(--orbix-scrollbar) transparent;
 }

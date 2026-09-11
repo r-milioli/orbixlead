@@ -106,6 +106,17 @@ export const theme = createTheme({
         radius: "sm",
         size: "sm",
       },
+      styles: {
+        dropdown: {
+          backgroundColor: "var(--orbix-surface)",
+          borderColor: "var(--orbix-border)",
+        },
+        option: {
+          "&[data-checked]": {
+            backgroundColor: "var(--orbix-primary-light)",
+          },
+        },
+      },
     },
     Textarea: {
       defaultProps: {
@@ -124,6 +135,12 @@ export const theme = createTheme({
         radius: "md",
         shadow: "none",
       },
+      styles: {
+        root: {
+          backgroundColor: "var(--orbix-surface)",
+          borderColor: "var(--orbix-border-light)",
+        },
+      },
     },
     Card: {
       defaultProps: {
@@ -134,8 +151,9 @@ export const theme = createTheme({
       },
       styles: {
         root: {
-          borderColor: colors.borderLight,
-          background: colors.surface,
+          borderColor: "var(--orbix-border-light)",
+          backgroundColor: "var(--orbix-surface)",
+          color: "var(--orbix-text)",
         },
       },
     },
@@ -143,6 +161,67 @@ export const theme = createTheme({
       defaultProps: {
         radius: "lg",
         centered: true,
+      },
+      styles: {
+        content: {
+          backgroundColor: "var(--orbix-surface)",
+        },
+        header: {
+          backgroundColor: "var(--orbix-surface)",
+        },
+      },
+    },
+    Accordion: {
+      styles: {
+        item: {
+          backgroundColor: "var(--orbix-surface)",
+          borderColor: "var(--orbix-border)",
+        },
+        control: {
+          backgroundColor: "var(--orbix-surface)",
+          color: "var(--orbix-text)",
+          "&:hover": {
+            backgroundColor: "var(--orbix-surface-hover)",
+          },
+        },
+        panel: {
+          backgroundColor: "var(--orbix-surface-secondary)",
+          color: "var(--orbix-text)",
+        },
+      },
+    },
+    Table: {
+      styles: {
+        table: {
+          color: "var(--orbix-text)",
+        },
+        th: {
+          color: "var(--orbix-text-secondary)",
+        },
+      },
+    },
+    Menu: {
+      styles: {
+        dropdown: {
+          backgroundColor: "var(--orbix-surface)",
+          borderColor: "var(--orbix-border)",
+        },
+        item: {
+          color: "var(--orbix-text)",
+          "&:hover": {
+            backgroundColor: "var(--orbix-surface-hover)",
+          },
+        },
+      },
+    },
+    Tabs: {
+      styles: {
+        tab: {
+          color: "var(--orbix-text-secondary)",
+          "&[data-active]": {
+            color: "var(--orbix-primary)",
+          },
+        },
       },
     },
     Badge: {

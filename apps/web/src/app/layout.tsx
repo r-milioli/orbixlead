@@ -11,7 +11,6 @@ import "@mantine/charts/styles.css";
 import "./globals.css";
 import { theme } from "@/theme/mantine";
 import { AuthProvider } from "@/lib/auth";
-import { colors } from "@/theme/tokens";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -34,11 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <ColorSchemeScript defaultColorScheme="light" />
       </head>
-      <body
-        style={{ fontFamily: "Inter, system-ui, sans-serif", background: colors.background }}
-        suppressHydrationWarning
-      >
-        <MantineProvider theme={theme} defaultColorScheme="light" forceColorScheme="light">
+      <body style={{ fontFamily: "Inter, system-ui, sans-serif" }} suppressHydrationWarning>
+        <MantineProvider theme={theme} defaultColorScheme="light">
           <DatesProvider settings={{ locale: "pt-br", firstDayOfWeek: 0 }}>
             <Notifications position="top-right" zIndex={4000} />
             <AuthProvider>{children}</AuthProvider>
