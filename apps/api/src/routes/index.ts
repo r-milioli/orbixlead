@@ -11,7 +11,6 @@ import goalsRoutes from "./goals";
 import notificationsRoutes from "./notifications";
 import settingsRoutes from "./settings";
 import dashboardRoutes from "./dashboard";
-import internalRoutes from "./internal";
 
 const router = Router();
 
@@ -27,7 +26,6 @@ router.use("/goals", goalsRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/settings", settingsRoutes);
 router.use("/dashboard", dashboardRoutes);
-router.use("/internal", internalRoutes);
 
 router.get("/health", (_req, res) => {
   res.json({ ok: true, service: "@orbixlead/api" });

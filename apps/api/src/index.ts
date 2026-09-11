@@ -14,6 +14,7 @@ import { bootstrapSuperAdminFromEnv } from "./lib/bootstrap-super-admin";
 import { assertRedis, redisTarget } from "./lib/redis";
 import { PrismaSessionStore } from "./lib/session-store";
 import apiRoutes from "./routes";
+import internalRoutes from "./routes/internal";
 
 const app = express();
 const port = Number(process.env.API_PORT || 4000);
@@ -29,6 +30,11 @@ app.use(
   })
 );
 app.use(express.json({ limit: "2mb" }));
+
+// Rotas do scraper: sem cookie/sessão e fora de /api (Traefik do front usa PathPrefix `/api`).
+app.use("/internal", internalRoutes);
+app.use("/api/v1/internal", internalRoutes);
+
 app.use(cookieParser());
 app.use(
   session({

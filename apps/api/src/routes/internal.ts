@@ -8,20 +8,38 @@ import {
 import { JobStatus, Prisma, Temperature } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/serialize";
+import { logger } from "../lib/logger";
 import { releaseReservation, settle } from "../services/credits";
 import { sendMail } from "../lib/mailer";
 
 const router = Router();
 
 function requireInternalKey(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
-  const key = req.header("x-internal-key");
-  const expected = process.env.INTERNAL_API_KEY;
-  if (!expected || key !== expected) {
+  const key = (req.header("x-internal-key") ?? "").trim();
+  const expected = (process.env.INTERNAL_API_KEY ?? "").trim();
+  if (!expected || !key || key !== expected) {
+    logger.warn("internal_unauthorized", {
+      path: req.originalUrl,
+      method: req.method,
+      hasHeader: Boolean(key),
+      hasExpected: Boolean(expected),
+      headerLen: key.length,
+      expectedLen: expected.length,
+    });
     return res.status(401).json({ error: "Unauthorized" });
   }
   return next();
 }
 
+router.use((req, _res, next) => {
+  logger.info("internal_request", {
+    method: req.method,
+    path: req.originalUrl,
+    contentType: req.header("content-type") ?? null,
+    contentLength: req.header("content-length") ?? null,
+  });
+  return next();
+});
 router.use(requireInternalKey);
 
 const tempFromScore: Record<string, Temperature> = {
@@ -110,6 +128,10 @@ router.post(
 router.post(
   "/jobs/:id/complete",
   asyncHandler(async (req, res) => {
+    logger.info("internal_complete_received", {
+      jobId: req.params.id,
+      resultCount: Array.isArray(req.body?.results) ? req.body.results.length : 0,
+    });
     const body = z
       .object({
         results: z

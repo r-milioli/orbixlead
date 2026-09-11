@@ -20,8 +20,12 @@ function baseUrl(): string {
 function headers(): HeadersInit {
   return {
     "Content-Type": "application/json",
-    "x-internal-key": requireEnv("INTERNAL_API_KEY"),
+    "x-internal-key": requireEnv("INTERNAL_API_KEY").trim(),
   };
+}
+
+function internalPath(suffix: string): string {
+  return `/internal${suffix.startsWith("/") ? suffix : `/${suffix}`}`;
 }
 
 async function parseJson<T>(res: Response): Promise<T> {
@@ -44,6 +48,8 @@ async function request<T>(
     method,
     headers: headers(),
     body: body === undefined ? undefined : JSON.stringify(body),
+    redirect: "manual",
+    credentials: "omit",
   });
 
   if (!res.ok) {
@@ -71,13 +77,16 @@ function toApiResults(results: ScrapedResult[]) {
 
 /**
  * Marks job as running and returns scrape parameters.
- * POST /api/v1/internal/jobs/:id/start
+ * POST /internal/jobs/:id/start
  */
 export async function notifyJobStart(jobId: string): Promise<JobStartInfo> {
-  const url = `${baseUrl()}/api/v1/internal/jobs/${jobId}/start`;
+  const path = internalPath(`/jobs/${jobId}/start`);
+  const url = `${baseUrl()}${path}`;
   const res = await fetch(url, {
     method: "POST",
     headers: headers(),
+    redirect: "manual",
+    credentials: "omit",
   });
 
   const text = await res.text().catch(() => "");
@@ -95,7 +104,7 @@ export async function notifyJobStart(jobId: string): Promise<JobStartInfo> {
   }
 
   if (!res.ok) {
-    throw new Error(`API POST /api/v1/internal/jobs/${jobId}/start → ${res.status}: ${text.slice(0, 400)}`);
+    throw new Error(`API POST ${path} → ${res.status}: ${text.slice(0, 400)}`);
   }
 
   const job =
@@ -120,27 +129,27 @@ export async function notifyJobStart(jobId: string): Promise<JobStartInfo> {
 
 /**
  * Submits scraped results. API normalizes phone, scores, dedupes, settles credits.
- * POST /api/v1/internal/jobs/:id/complete  body: { results: [...] }
+ * POST /internal/jobs/:id/complete  body: { results: [...] }
  */
 export async function notifyJobComplete(
   jobId: string,
   results: ScrapedResult[]
 ): Promise<void> {
-  await request("POST", `/api/v1/internal/jobs/${jobId}/complete`, {
+  await request("POST", internalPath(`/jobs/${jobId}/complete`), {
     results: toApiResults(results),
   });
 }
 
 /**
  * Marks job failed (API releases reservation when final=true).
- * POST /api/v1/internal/jobs/:id/fail  body: { errorMessage, final?, attempt? }
+ * POST /internal/jobs/:id/fail  body: { errorMessage, final?, attempt? }
  */
 export async function notifyJobFail(
   jobId: string,
   message: string,
   opts?: { final?: boolean; attempt?: number }
 ): Promise<void> {
-  await request("POST", `/api/v1/internal/jobs/${jobId}/fail`, {
+  await request("POST", internalPath(`/jobs/${jobId}/fail`), {
     errorMessage: message,
     final: opts?.final ?? true,
     ...(opts?.attempt !== undefined ? { attempt: opts.attempt } : {}),

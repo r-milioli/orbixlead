@@ -114,6 +114,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://orbixlead:ALTERE_A_SENHA@postgres:5432/orbixlead?schema=public
       REDIS_URL: redis://redis:6379
+      # Use o DNS interno do Swarm, não o domínio público (Traefik/sessão).
       API_URL: http://api:4000
       SCRAPER_MODE: playwright
       INTERNAL_API_KEY: altere-esta-chave-interna
