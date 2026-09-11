@@ -5,7 +5,7 @@ import {
   normalizePhoneE164,
   scoreTemperature,
 } from "@orbixlead/shared";
-import { Role, Temperature } from "@prisma/client";
+import { LeadClosedReason, Role, Temperature } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
@@ -22,6 +22,11 @@ const tempFromScore: Record<string, Temperature> = {
   frio: Temperature.FRIO,
   morno: Temperature.MORNO,
   quente: Temperature.QUENTE,
+};
+
+const closedReasonToApi: Record<LeadClosedReason, string> = {
+  CONVERTED: "converted",
+  LOST: "lost",
 };
 
 function serializeLead(lead: {
@@ -43,6 +48,8 @@ function serializeLead(lead: {
   hasWebsite: boolean;
   segment: string | null;
   notes: string | null;
+  closedAt: Date | null;
+  closedReason: LeadClosedReason | null;
   softDeletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -70,6 +77,8 @@ function serializeLead(lead: {
     hasWebsite: lead.hasWebsite,
     segment: lead.segment,
     notes: lead.notes,
+    closedAt: lead.closedAt?.toISOString() ?? null,
+    closedReason: lead.closedReason ? closedReasonToApi[lead.closedReason] : null,
     softDeletedAt: lead.softDeletedAt?.toISOString() ?? null,
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
@@ -99,6 +108,8 @@ router.get(
       "website",
       "mapsUrl",
       "segment",
+      "closedAt",
+      "closedReason",
       "createdAt",
     ];
     const rows = leads.map((l) =>
@@ -113,6 +124,8 @@ router.get(
         csvEscape(l.website ?? ""),
         csvEscape(l.mapsUrl ?? ""),
         csvEscape(l.segment ?? ""),
+        l.closedAt?.toISOString() ?? "",
+        l.closedReason ? closedReasonToApi[l.closedReason] : "",
         l.createdAt.toISOString(),
       ].join(",")
     );
@@ -128,14 +141,35 @@ router.get(
   "/",
   asyncHandler(async (req: AuthedRequest, res) => {
     const stageId = typeof req.query.stageId === "string" ? req.query.stageId : undefined;
+    const statusRaw = typeof req.query.status === "string" ? req.query.status.toLowerCase() : "open";
+    const status = statusRaw === "closed" || statusRaw === "all" || statusRaw === "open" ? statusRaw : "open";
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const city = typeof req.query.city === "string" ? req.query.city.trim() : "";
+    const segment = typeof req.query.segment === "string" ? req.query.segment.trim() : "";
+
     const leads = await prisma.lead.findMany({
       where: {
         tenantId: req.user!.tenantId!,
         softDeletedAt: null,
         ...(stageId ? { stageId } : {}),
+        ...(status === "open" ? { closedAt: null } : {}),
+        ...(status === "closed" ? { closedAt: { not: null } } : {}),
+        ...(city ? { city: { contains: city, mode: "insensitive" } } : {}),
+        ...(segment ? { segment: { contains: segment, mode: "insensitive" } } : {}),
+        ...(q
+          ? {
+              OR: [
+                { companyName: { contains: q, mode: "insensitive" } },
+                { phoneE164: { contains: q } },
+                { city: { contains: q, mode: "insensitive" } },
+                { segment: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
       },
       include: { stage: true },
-      orderBy: { updatedAt: "desc" },
+      orderBy: status === "closed" ? { closedAt: "desc" } : { updatedAt: "desc" },
+      take: 500,
     });
     return res.json({ leads: leads.map(serializeLead) });
   })
@@ -246,6 +280,103 @@ router.post(
   })
 );
 
+router.post(
+  "/:id/close",
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = z
+      .object({
+        reason: z.enum(["converted", "lost"]),
+      })
+      .parse(req.body);
+
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId: req.user!.tenantId!, softDeletedAt: null },
+    });
+    if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
+    if (lead.closedAt) {
+      return res.status(400).json({ error: "Lead já está encerrado" });
+    }
+
+    const targetSlug = body.reason === "converted" ? "converted" : "lost";
+    const stage = await prisma.pipelineStage.findFirst({
+      where: { tenantId: req.user!.tenantId!, slug: targetSlug },
+    });
+    if (!stage) {
+      return res.status(500).json({ error: `Estágio '${targetSlug}' não encontrado` });
+    }
+
+    const closedReason =
+      body.reason === "converted" ? LeadClosedReason.CONVERTED : LeadClosedReason.LOST;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.lead.update({
+        where: { id: lead.id },
+        data: {
+          stageId: stage.id,
+          closedAt: new Date(),
+          closedReason,
+        },
+        include: { stage: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          tenantId: req.user!.tenantId!,
+          userId: req.user!.id,
+          action: "lead_close",
+          entity: "Lead",
+          entityId: lead.id,
+          meta: { reason: body.reason, companyName: lead.companyName },
+        },
+      });
+      return next;
+    });
+
+    return res.json({ lead: serializeLead(updated) });
+  })
+);
+
+router.post(
+  "/:id/reopen",
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId: req.user!.tenantId!, softDeletedAt: null },
+    });
+    if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
+    if (!lead.closedAt) {
+      return res.status(400).json({ error: "Lead não está encerrado" });
+    }
+
+    const followUp = await prisma.pipelineStage.findFirst({
+      where: { tenantId: req.user!.tenantId!, slug: "follow_up" },
+    });
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.lead.update({
+        where: { id: lead.id },
+        data: {
+          closedAt: null,
+          closedReason: null,
+          ...(followUp ? { stageId: followUp.id } : {}),
+        },
+        include: { stage: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          tenantId: req.user!.tenantId!,
+          userId: req.user!.id,
+          action: "lead_reopen",
+          entity: "Lead",
+          entityId: lead.id,
+          meta: { companyName: lead.companyName },
+        },
+      });
+      return next;
+    });
+
+    return res.json({ lead: serializeLead(updated) });
+  })
+);
+
 router.patch(
   "/:id/move",
   asyncHandler(async (req: AuthedRequest, res) => {
@@ -254,6 +385,9 @@ router.patch(
       where: { id: req.params.id, tenantId: req.user!.tenantId!, softDeletedAt: null },
     });
     if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
+    if (lead.closedAt) {
+      return res.status(400).json({ error: "Lead encerrado — reabra antes de mover no pipeline" });
+    }
 
     const stage = await prisma.pipelineStage.findFirst({
       where: { id: body.stageId, tenantId: req.user!.tenantId! },
@@ -285,6 +419,9 @@ router.patch(
     if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
 
     if (body.stageId) {
+      if (lead.closedAt) {
+        return res.status(400).json({ error: "Lead encerrado — reabra antes de mudar o estágio" });
+      }
       const stage = await prisma.pipelineStage.findFirst({
         where: { id: body.stageId, tenantId: req.user!.tenantId! },
       });

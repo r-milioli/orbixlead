@@ -24,6 +24,8 @@ export type Lead = {
   notes?: string | null;
   stageId: string;
   stage?: PipelineStage;
+  closedAt?: string | null;
+  closedReason?: "converted" | "lost" | "CONVERTED" | "LOST" | null;
   softDeletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;

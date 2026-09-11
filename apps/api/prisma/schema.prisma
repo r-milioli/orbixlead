@@ -41,6 +41,11 @@ enum GoalPeriodType {
   DAILY
 }
 
+enum LeadClosedReason {
+  CONVERTED
+  LOST
+}
+
 model Tenant {
   id              String    @id @default(cuid())
   name            String
@@ -185,6 +190,8 @@ model Lead {
   segment               String?
   scrapingJobId         String?      @map("scraping_job_id")
   notes                 String?
+  closedAt              DateTime?    @map("closed_at")
+  closedReason          LeadClosedReason? @map("closed_reason")
   softDeletedAt         DateTime?    @map("soft_deleted_at")
   createdAt             DateTime     @default(now()) @map("created_at")
   updatedAt             DateTime     @updatedAt @map("updated_at")
@@ -198,6 +205,7 @@ model Lead {
   @@unique([tenantId, phoneE164, companyNameNormalized])
   @@index([tenantId, stageId])
   @@index([tenantId, softDeletedAt])
+  @@index([tenantId, closedAt])
   @@map("leads")
 }
 

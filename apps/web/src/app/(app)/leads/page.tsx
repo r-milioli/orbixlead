@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ActionIcon,
   Badge,
@@ -16,27 +17,32 @@ import {
   Select,
   Stack,
   Table,
+  Tabs,
   Text,
   TextInput,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import {
+  Archive,
+  ExternalLink,
   KanbanSquare,
   MapPin,
   MoreHorizontal,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   Star,
   Trash2,
 } from "lucide-react";
+import dayjs from "dayjs";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { TemperatureBadge } from "@/components/common/TemperatureBadge";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { api, ApiError } from "@/lib/api";
-import type { ScrapingResult } from "@/lib/types";
-import { unwrapList } from "@/lib/unwrap";
+import type { Lead, ScrapingResult } from "@/lib/types";
+import { unwrapList, unwrapOne } from "@/lib/unwrap";
 import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 const PAGE_SIZE = 25;
@@ -88,7 +94,16 @@ function Stars({ rating }: { rating?: number | null }) {
   );
 }
 
+function closedReasonLabel(reason?: string | null) {
+  const v = (reason || "").toLowerCase();
+  if (v === "converted") return "Convertido";
+  if (v === "lost") return "Perdido";
+  return "—";
+}
+
 export default function LeadsPage() {
+  const [tab, setTab] = useState<string | null>("capturados");
+
   const [rows, setRows] = useState<CapturedLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -101,7 +116,19 @@ export default function LeadsPage() {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const load = async (filters: AdvancedFilters, search: string) => {
+  const [crmLeads, setCrmLeads] = useState<Lead[]>([]);
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [crmQ, setCrmQ] = useState("");
+  const [crmPage, setCrmPage] = useState(1);
+  const [pendingClose, setPendingClose] = useState<{
+    id: string;
+    name: string;
+    reason: "converted" | "lost";
+  } | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [reopeningId, setReopeningId] = useState<string | null>(null);
+
+  const loadCaptured = async (filters: AdvancedFilters, search: string) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -128,9 +155,33 @@ export default function LeadsPage() {
     }
   };
 
-  useEffect(() => {
-    void load(appliedFilters, q);
+  const loadCrm = useCallback(async (status: "open" | "closed", search: string) => {
+    setCrmLoading(true);
+    try {
+      const params = new URLSearchParams({ status });
+      if (search.trim()) params.set("q", search.trim());
+      const data = await api(`/api/v1/leads?${params.toString()}`);
+      setCrmLeads(unwrapList<Lead>(data, "leads"));
+      setCrmPage(1);
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao carregar leads do CRM.",
+      });
+    } finally {
+      setCrmLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadCaptured(appliedFilters, q);
+  }, []);
+
+  useEffect(() => {
+    if (tab === "pipeline") void loadCrm("open", crmQ);
+    if (tab === "encerrados") void loadCrm("closed", crmQ);
+  }, [tab, loadCrm]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -144,6 +195,11 @@ export default function LeadsPage() {
     () => rows.filter((r) => !r.leadId && !r.isDuplicate && r.phoneE164).map((r) => r.id),
     [rows]
   );
+
+  const crmTotalPages = Math.max(1, Math.ceil(crmLeads.length / PAGE_SIZE));
+  const crmCurrentPage = Math.min(crmPage, crmTotalPages);
+  const crmPageStart = (crmCurrentPage - 1) * PAGE_SIZE;
+  const crmPageItems = crmLeads.slice(crmPageStart, crmPageStart + PAGE_SIZE);
 
   const toggleAllPage = (checked: boolean) => {
     const ids = pageItems
@@ -163,7 +219,7 @@ export default function LeadsPage() {
   const applyFilters = () => {
     setAppliedFilters(draftFilters);
     closeFilters();
-    void load(draftFilters, q);
+    void loadCaptured(draftFilters, q);
     notifications.show({
       color: "orbix",
       title: "Filtros aplicados",
@@ -174,7 +230,7 @@ export default function LeadsPage() {
   const clearFilters = () => {
     setDraftFilters(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
-    void load(DEFAULT_FILTERS, q);
+    void loadCaptured(DEFAULT_FILTERS, q);
     notifications.show({
       color: "gray",
       title: "Filtros limpos",
@@ -201,7 +257,7 @@ export default function LeadsPage() {
         }.`,
       });
       setSelected([]);
-      await load(appliedFilters, q);
+      await loadCaptured(appliedFilters, q);
     } catch (err) {
       notifications.show({
         color: "red",
@@ -233,10 +289,63 @@ export default function LeadsPage() {
     }
   };
 
+  const confirmClose = async () => {
+    if (!pendingClose) return;
+    setClosing(true);
+    try {
+      await api(`/api/v1/leads/${pendingClose.id}/close`, {
+        method: "POST",
+        body: { reason: pendingClose.reason },
+      });
+      notifications.show({
+        color: "green",
+        title: "Jornada encerrada",
+        message: `"${pendingClose.name}" foi arquivado em Encerrados.`,
+      });
+      setPendingClose(null);
+      await loadCrm(tab === "encerrados" ? "closed" : "open", crmQ);
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao encerrar.",
+      });
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const reopenLead = async (lead: Lead) => {
+    setReopeningId(lead.id);
+    try {
+      const payload = await api(`/api/v1/leads/${lead.id}/reopen`, { method: "POST" });
+      unwrapOne<Lead>(payload, "lead");
+      notifications.show({
+        color: "green",
+        title: "Lead reaberto",
+        message: "Voltou ao pipeline ativo (Follow up).",
+      });
+      await loadCrm("closed", crmQ);
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao reabrir.",
+      });
+    } finally {
+      setReopeningId(null);
+    }
+  };
+
   const rangeLabel =
     rows.length === 0
       ? "Mostrando 0 de 0 leads"
       : `Mostrando ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, rows.length)} de ${rows.length} leads`;
+
+  const crmRangeLabel =
+    crmLeads.length === 0
+      ? "Mostrando 0 de 0 leads"
+      : `Mostrando ${crmPageStart + 1}–${Math.min(crmPageStart + PAGE_SIZE, crmLeads.length)} de ${crmLeads.length} leads`;
 
   const activeFilterCount =
     appliedFilters.temperatures.length +
@@ -249,235 +358,527 @@ export default function LeadsPage() {
   return (
     <>
       <PageHeader
-        title="Leads Capturados"
-        subtitle="Gerencie os leads encontrados nas suas prospecções."
+        title="Leads"
+        subtitle="Capture, acompanhe no pipeline e consulte jornadas encerradas."
         actions={
-          <Group gap="sm">
-            <Button
-              variant="default"
-              leftSection={<SlidersHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-              onClick={() => {
-                setDraftFilters(appliedFilters);
-                openFilters();
-              }}
-            >
-              Filtros
-              {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-            </Button>
-            <Button
-              leftSection={<KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-              disabled={selected.length === 0}
-              loading={sending}
-              onClick={() => void sendToCrm(selected)}
-            >
-              Adicionar ao CRM
-              {selected.length > 0 ? ` (${selected.length})` : ""}
-            </Button>
-          </Group>
+          tab === "capturados" ? (
+            <Group gap="sm">
+              <Button
+                variant="default"
+                leftSection={<SlidersHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                onClick={() => {
+                  setDraftFilters(appliedFilters);
+                  openFilters();
+                }}
+              >
+                Filtros
+                {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              </Button>
+              <Button
+                leftSection={<KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                disabled={selected.length === 0}
+                loading={sending}
+                onClick={() => void sendToCrm(selected)}
+              >
+                Adicionar ao CRM
+                {selected.length > 0 ? ` (${selected.length})` : ""}
+              </Button>
+            </Group>
+          ) : undefined
         }
       />
 
-      <Group gap="sm" mb="md" wrap="wrap">
-        <TextInput
-          placeholder="Buscar empresa, telefone..."
-          leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
-          value={q}
-          onChange={(e) => setQ(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void load(appliedFilters, q);
-          }}
-          style={{ flex: "1 1 260px", maxWidth: 360 }}
-        />
-        <Select
-          placeholder="Temperatura"
-          clearable
-          data={[
-            { value: "quente", label: "Quente" },
-            { value: "morno", label: "Morno" },
-            { value: "frio", label: "Frio" },
-          ]}
-          value={appliedFilters.temperatures[0] ?? null}
-          onChange={(value) => {
-            const next = {
-              ...appliedFilters,
-              temperatures: value ? [value as "frio" | "morno" | "quente"] : [],
-            };
-            setAppliedFilters(next);
-            setDraftFilters(next);
-            void load(next, q);
-          }}
-          w={160}
-        />
-        <Button variant="subtle" onClick={() => void load(appliedFilters, q)}>
-          Buscar
-        </Button>
-      </Group>
+      <Tabs value={tab} onChange={setTab} mb="md">
+        <Tabs.List>
+          <Tabs.Tab value="capturados">Capturados</Tabs.Tab>
+          <Tabs.Tab value="pipeline">No pipeline</Tabs.Tab>
+          <Tabs.Tab value="encerrados">Encerrados</Tabs.Tab>
+        </Tabs.List>
 
-      {loading ? (
-        <Center mih={240}>
-          <Loader color="orbix" />
-        </Center>
-      ) : rows.length === 0 ? (
-        <EmptyState
-          title="Nenhum lead capturado"
-          description="Execute uma captura ou ajuste os filtros avançados."
-        />
-      ) : (
-        <Card padding={0}>
-          <Table.ScrollContainer minWidth={960}>
-            <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
-              <Table.Thead style={{ background: colors.background }}>
-                <Table.Tr>
-                  <Table.Th w={44}>
-                    <Checkbox
-                      aria-label="Selecionar página"
-                      checked={allPageSelected}
-                      indeterminate={somePageSelected}
-                      onChange={(e) => toggleAllPage(e.currentTarget.checked)}
-                    />
-                  </Table.Th>
-                  <Table.Th>Empresa</Table.Th>
-                  <Table.Th>Cidade</Table.Th>
-                  <Table.Th>Temperatura</Table.Th>
-                  <Table.Th>Avaliações</Table.Th>
-                  <Table.Th>Telefone</Table.Th>
-                  <Table.Th>Site</Table.Th>
-                  <Table.Th w={56} ta="center">
-                    Ações
-                  </Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {pageItems.map((lead) => {
-                  const canSelect = !lead.leadId && !lead.isDuplicate && Boolean(lead.phoneE164);
-                  return (
-                    <Table.Tr
-                      key={lead.id}
-                      bg={selected.includes(lead.id) ? colors.primaryLight : undefined}
-                    >
-                      <Table.Td>
+        <Tabs.Panel value="capturados" pt="md">
+          <Group gap="sm" mb="md" wrap="wrap">
+            <TextInput
+              placeholder="Buscar empresa, telefone..."
+              leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
+              value={q}
+              onChange={(e) => setQ(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void loadCaptured(appliedFilters, q);
+              }}
+              style={{ flex: "1 1 260px", maxWidth: 360 }}
+            />
+            <Select
+              placeholder="Temperatura"
+              clearable
+              data={[
+                { value: "quente", label: "Quente" },
+                { value: "morno", label: "Morno" },
+                { value: "frio", label: "Frio" },
+              ]}
+              value={appliedFilters.temperatures[0] ?? null}
+              onChange={(value) => {
+                const next = {
+                  ...appliedFilters,
+                  temperatures: value ? [value as "frio" | "morno" | "quente"] : [],
+                };
+                setAppliedFilters(next);
+                setDraftFilters(next);
+                void loadCaptured(next, q);
+              }}
+              w={160}
+            />
+            <Button variant="subtle" onClick={() => void loadCaptured(appliedFilters, q)}>
+              Buscar
+            </Button>
+          </Group>
+
+          {loading ? (
+            <Center mih={240}>
+              <Loader color="orbix" />
+            </Center>
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title="Nenhum lead capturado"
+              description="Execute uma captura ou ajuste os filtros avançados."
+            />
+          ) : (
+            <Card padding={0}>
+              <Table.ScrollContainer minWidth={960}>
+                <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
+                  <Table.Thead style={{ background: colors.background }}>
+                    <Table.Tr>
+                      <Table.Th w={44}>
                         <Checkbox
-                          aria-label={`Selecionar ${lead.companyName}`}
-                          checked={selected.includes(lead.id)}
-                          disabled={!canSelect}
-                          onChange={(e) => toggleOne(lead.id, e.currentTarget.checked)}
+                          aria-label="Selecionar página"
+                          checked={allPageSelected}
+                          indeterminate={somePageSelected}
+                          onChange={(e) => toggleAllPage(e.currentTarget.checked)}
                         />
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm" fw={600}>
-                          {lead.companyName}
-                        </Text>
-                        <Text size="xs" c={colors.textMuted}>
-                          {lead.segment || "—"}
-                          {lead.leadId ? " · já no CRM" : ""}
-                          {lead.isDuplicate ? " · duplicado" : ""}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">{lead.city || "—"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <TemperatureBadge value={lead.temperature} />
-                      </Table.Td>
-                      <Table.Td>
-                        <Stars rating={lead.rating} />
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">{lead.phoneE164 || lead.phoneRaw || "—"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        {lead.hasWebsite || lead.website ? (
-                          <Text size="sm" c={colors.textSecondary}>
-                            Disponível
+                      </Table.Th>
+                      <Table.Th>Empresa</Table.Th>
+                      <Table.Th>Cidade</Table.Th>
+                      <Table.Th>Temperatura</Table.Th>
+                      <Table.Th>Avaliações</Table.Th>
+                      <Table.Th>Telefone</Table.Th>
+                      <Table.Th>Site</Table.Th>
+                      <Table.Th w={56} ta="center">
+                        Ações
+                      </Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {pageItems.map((lead) => {
+                      const canSelect = !lead.leadId && !lead.isDuplicate && Boolean(lead.phoneE164);
+                      return (
+                        <Table.Tr
+                          key={lead.id}
+                          bg={selected.includes(lead.id) ? colors.primaryLight : undefined}
+                        >
+                          <Table.Td>
+                            <Checkbox
+                              aria-label={`Selecionar ${lead.companyName}`}
+                              checked={selected.includes(lead.id)}
+                              disabled={!canSelect}
+                              onChange={(e) => toggleOne(lead.id, e.currentTarget.checked)}
+                            />
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm" fw={600}>
+                              {lead.companyName}
+                            </Text>
+                            <Text size="xs" c={colors.textMuted}>
+                              {lead.segment || "—"}
+                              {lead.leadId ? " · já no CRM" : ""}
+                              {lead.isDuplicate ? " · duplicado" : ""}
+                            </Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">{lead.city || "—"}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            <TemperatureBadge value={lead.temperature} />
+                          </Table.Td>
+                          <Table.Td>
+                            <Stars rating={lead.rating} />
+                          </Table.Td>
+                          <Table.Td>
+                            <Text size="sm">{lead.phoneE164 || lead.phoneRaw || "—"}</Text>
+                          </Table.Td>
+                          <Table.Td>
+                            {lead.hasWebsite || lead.website ? (
+                              <Text size="sm" c={colors.textSecondary}>
+                                Disponível
+                              </Text>
+                            ) : (
+                              <Badge
+                                variant="light"
+                                styles={{
+                                  root: {
+                                    background: colors.dangerBg,
+                                    color: colors.danger,
+                                  },
+                                }}
+                              >
+                                Sem site
+                              </Badge>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            <Menu shadow="md" width={210} position="bottom-end" withinPortal>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                                  <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                {lead.mapsUrl ? (
+                                  <Menu.Item
+                                    component="a"
+                                    href={lead.mapsUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    leftSection={
+                                      <MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                    }
+                                  >
+                                    Abrir no Maps
+                                  </Menu.Item>
+                                ) : null}
+                                {canSelect ? (
+                                  <Menu.Item
+                                    leftSection={
+                                      <KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                    }
+                                    onClick={() => void sendToCrm([lead.id])}
+                                  >
+                                    Adicionar ao CRM
+                                  </Menu.Item>
+                                ) : null}
+                                {(lead.mapsUrl || canSelect) && <Menu.Divider />}
+                                <Menu.Item
+                                  color="red"
+                                  leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                  onClick={() =>
+                                    setPendingDelete({ id: lead.id, name: lead.companyName })
+                                  }
+                                >
+                                  Excluir
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+
+              <Group
+                justify="space-between"
+                px="md"
+                py="md"
+                style={{ borderTop: `1px solid ${colors.borderLight}` }}
+              >
+                <Text size="sm" c={colors.textMuted}>
+                  {rangeLabel}
+                  {selected.length > 0 ? ` · ${selected.length} selecionado(s)` : ""}
+                  {selectableIds.length > 0 ? ` · ${selectableIds.length} disponíveis` : ""}
+                </Text>
+                <Pagination
+                  total={totalPages}
+                  value={currentPage}
+                  onChange={setPage}
+                  size="sm"
+                  radius="sm"
+                  color="orbix"
+                  withEdges
+                />
+              </Group>
+            </Card>
+          )}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="pipeline" pt="md">
+          <Group gap="sm" mb="md" wrap="wrap">
+            <TextInput
+              placeholder="Buscar no pipeline..."
+              leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
+              value={crmQ}
+              onChange={(e) => setCrmQ(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void loadCrm("open", crmQ);
+              }}
+              style={{ flex: "1 1 260px", maxWidth: 360 }}
+            />
+            <Button variant="subtle" onClick={() => void loadCrm("open", crmQ)}>
+              Buscar
+            </Button>
+          </Group>
+
+          {crmLoading ? (
+            <Center mih={240}>
+              <Loader color="orbix" />
+            </Center>
+          ) : crmLeads.length === 0 ? (
+            <EmptyState
+              title="Nenhum lead no pipeline"
+              description="Envie resultados da captura para o CRM para acompanhá-los aqui."
+            />
+          ) : (
+            <Card padding={0}>
+              <Table.ScrollContainer minWidth={900}>
+                <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
+                  <Table.Thead style={{ background: colors.background }}>
+                    <Table.Tr>
+                      <Table.Th>Empresa</Table.Th>
+                      <Table.Th>Estágio</Table.Th>
+                      <Table.Th>Cidade</Table.Th>
+                      <Table.Th>Temperatura</Table.Th>
+                      <Table.Th>Telefone</Table.Th>
+                      <Table.Th>Segmento</Table.Th>
+                      <Table.Th w={56} ta="center">
+                        Ações
+                      </Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {crmPageItems.map((lead) => (
+                      <Table.Tr key={lead.id}>
+                        <Table.Td>
+                          <Text size="sm" fw={600}>
+                            {lead.companyName}
                           </Text>
-                        ) : (
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="orbix">
+                            {lead.stage?.label || "—"}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{lead.city || "—"}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <TemperatureBadge value={lead.temperature} />
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{lead.phoneE164}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c={colors.textSecondary}>
+                            {lead.segment || "—"}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Menu shadow="md" width={220} position="bottom-end" withinPortal>
+                            <Menu.Target>
+                              <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                                <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item
+                                component={Link}
+                                href={`/crm/leads/${lead.id}`}
+                                leftSection={
+                                  <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                }
+                              >
+                                Abrir ficha
+                              </Menu.Item>
+                              <Menu.Divider />
+                              <Menu.Item
+                                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                onClick={() =>
+                                  setPendingClose({
+                                    id: lead.id,
+                                    name: lead.companyName,
+                                    reason: "converted",
+                                  })
+                                }
+                              >
+                                Encerrar como convertido
+                              </Menu.Item>
+                              <Menu.Item
+                                color="red"
+                                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                onClick={() =>
+                                  setPendingClose({
+                                    id: lead.id,
+                                    name: lead.companyName,
+                                    reason: "lost",
+                                  })
+                                }
+                              >
+                                Encerrar como perdido
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+              <Group
+                justify="space-between"
+                px="md"
+                py="md"
+                style={{ borderTop: `1px solid ${colors.borderLight}` }}
+              >
+                <Text size="sm" c={colors.textMuted}>
+                  {crmRangeLabel}
+                </Text>
+                <Pagination
+                  total={crmTotalPages}
+                  value={crmCurrentPage}
+                  onChange={setCrmPage}
+                  size="sm"
+                  radius="sm"
+                  color="orbix"
+                  withEdges
+                />
+              </Group>
+            </Card>
+          )}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="encerrados" pt="md">
+          <Group gap="sm" mb="md" wrap="wrap">
+            <TextInput
+              placeholder="Buscar encerrados..."
+              leftSection={<Search size={16} strokeWidth={ICON_STROKE} />}
+              value={crmQ}
+              onChange={(e) => setCrmQ(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void loadCrm("closed", crmQ);
+              }}
+              style={{ flex: "1 1 260px", maxWidth: 360 }}
+            />
+            <Button variant="subtle" onClick={() => void loadCrm("closed", crmQ)}>
+              Buscar
+            </Button>
+          </Group>
+
+          {crmLoading ? (
+            <Center mih={240}>
+              <Loader color="orbix" />
+            </Center>
+          ) : crmLeads.length === 0 ? (
+            <EmptyState
+              title="Nenhum lead encerrado"
+              description="Ao finalizar a jornada (convertido ou perdido), o lead aparece aqui para consulta."
+            />
+          ) : (
+            <Card padding={0}>
+              <Table.ScrollContainer minWidth={960}>
+                <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
+                  <Table.Thead style={{ background: colors.background }}>
+                    <Table.Tr>
+                      <Table.Th>Empresa</Table.Th>
+                      <Table.Th>Motivo</Table.Th>
+                      <Table.Th>Encerrado em</Table.Th>
+                      <Table.Th>Cidade</Table.Th>
+                      <Table.Th>Telefone</Table.Th>
+                      <Table.Th>Segmento</Table.Th>
+                      <Table.Th w={56} ta="center">
+                        Ações
+                      </Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {crmPageItems.map((lead) => (
+                      <Table.Tr key={lead.id}>
+                        <Table.Td>
+                          <Text size="sm" fw={600}>
+                            {lead.companyName}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
                           <Badge
                             variant="light"
-                            styles={{
-                              root: {
-                                background: colors.dangerBg,
-                                color: colors.danger,
-                              },
-                            }}
+                            color={
+                              (lead.closedReason || "").toLowerCase() === "converted"
+                                ? "green"
+                                : "gray"
+                            }
                           >
-                            Sem site
+                            {closedReasonLabel(lead.closedReason)}
                           </Badge>
-                        )}
-                      </Table.Td>
-                      <Table.Td>
-                        <Menu shadow="md" width={210} position="bottom-end" withinPortal>
-                          <Menu.Target>
-                            <ActionIcon variant="subtle" color="gray" aria-label="Ações">
-                              <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                            </ActionIcon>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            {lead.mapsUrl ? (
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">
+                            {lead.closedAt
+                              ? dayjs(lead.closedAt).format("DD/MM/YYYY HH:mm")
+                              : "—"}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{lead.city || "—"}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{lead.phoneE164}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c={colors.textSecondary}>
+                            {lead.segment || "—"}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Menu shadow="md" width={210} position="bottom-end" withinPortal>
+                            <Menu.Target>
+                              <ActionIcon variant="subtle" color="gray" aria-label="Ações">
+                                <MoreHorizontal size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
                               <Menu.Item
-                                component="a"
-                                href={lead.mapsUrl}
-                                target="_blank"
-                                rel="noreferrer"
+                                component={Link}
+                                href={`/crm/leads/${lead.id}`}
                                 leftSection={
-                                  <MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                  <ExternalLink size={ICON_SIZE} strokeWidth={ICON_STROKE} />
                                 }
                               >
-                                Abrir no Maps
+                                Consultar ficha
                               </Menu.Item>
-                            ) : null}
-                            {canSelect ? (
                               <Menu.Item
-                                leftSection={
-                                  <KanbanSquare size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-                                }
-                                onClick={() => void sendToCrm([lead.id])}
+                                leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                                onClick={() => void reopenLead(lead)}
+                                disabled={reopeningId === lead.id}
                               >
-                                Adicionar ao CRM
+                                Reabrir no pipeline
                               </Menu.Item>
-                            ) : null}
-                            {(lead.mapsUrl || canSelect) && <Menu.Divider />}
-                            <Menu.Item
-                              color="red"
-                              leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                              onClick={() =>
-                                setPendingDelete({ id: lead.id, name: lead.companyName })
-                              }
-                            >
-                              Excluir
-                            </Menu.Item>
-                          </Menu.Dropdown>
-                        </Menu>
-                      </Table.Td>
-                    </Table.Tr>
-                  );
-                })}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
-
-          <Group
-            justify="space-between"
-            px="md"
-            py="md"
-            style={{ borderTop: `1px solid ${colors.borderLight}` }}
-          >
-            <Text size="sm" c={colors.textMuted}>
-              {rangeLabel}
-              {selected.length > 0 ? ` · ${selected.length} selecionado(s)` : ""}
-              {selectableIds.length > 0 ? ` · ${selectableIds.length} disponíveis` : ""}
-            </Text>
-            <Pagination
-              total={totalPages}
-              value={currentPage}
-              onChange={setPage}
-              size="sm"
-              radius="sm"
-              color="orbix"
-              withEdges
-            />
-          </Group>
-        </Card>
-      )}
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+              <Group
+                justify="space-between"
+                px="md"
+                py="md"
+                style={{ borderTop: `1px solid ${colors.borderLight}` }}
+              >
+                <Text size="sm" c={colors.textMuted}>
+                  {crmRangeLabel}
+                </Text>
+                <Pagination
+                  total={crmTotalPages}
+                  value={crmCurrentPage}
+                  onChange={setCrmPage}
+                  size="sm"
+                  radius="sm"
+                  color="orbix"
+                  withEdges
+                />
+              </Group>
+            </Card>
+          )}
+        </Tabs.Panel>
+      </Tabs>
 
       <Drawer
         opened={filtersOpen}
@@ -592,6 +993,21 @@ export default function LeadsPage() {
         title="Excluir lead capturado"
         message={`Tem certeza que deseja excluir "${pendingDelete?.name ?? ""}"? Esta ação não pode ser desfeita.`}
         confirmLabel="Excluir"
+      />
+
+      <ConfirmModal
+        opened={Boolean(pendingClose)}
+        onClose={() => setPendingClose(null)}
+        onConfirm={confirmClose}
+        loading={closing}
+        title="Encerrar jornada"
+        message={
+          pendingClose?.reason === "converted"
+            ? `Encerrar "${pendingClose?.name ?? ""}" como convertido? Sai do Kanban ativo e fica em Encerrados para auditoria.`
+            : `Encerrar "${pendingClose?.name ?? ""}" como perdido? Sai do Kanban ativo e fica em Encerrados para auditoria.`
+        }
+        confirmLabel="Encerrar"
+        danger={pendingClose?.reason === "lost"}
       />
     </>
   );

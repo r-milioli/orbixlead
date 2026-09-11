@@ -191,7 +191,7 @@ export default function CrmPage() {
     <>
       <PageHeader
         title="Pipeline"
-        subtitle="Conduza seus leads até a conversão."
+        subtitle="Kanban dos leads ativos. Convertidos e perdidos encerrados ficam em Leads → Encerrados."
         actions={
           <Group gap="sm">
             <Button

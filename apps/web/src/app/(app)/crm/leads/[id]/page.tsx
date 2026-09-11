@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ActionIcon,
   Anchor,
+  Badge,
   Button,
   Card,
   Center,
@@ -23,7 +24,7 @@ import {
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
 import { notifications } from "@mantine/notifications";
-import { ArrowLeft, Globe, MapPin, MessageCircle, Phone, Trash2 } from "lucide-react";
+import { ArrowLeft, Archive, Globe, MapPin, MessageCircle, Phone, RotateCcw, Trash2 } from "lucide-react";
 import dayjs from "dayjs";
 import { TemperatureBadge } from "@/components/common/TemperatureBadge";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
@@ -55,6 +56,11 @@ export default function LeadDetailPage() {
   const [saving, setSaving] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pendingCloseReason, setPendingCloseReason] = useState<"converted" | "lost" | null>(
+    null
+  );
+  const [closing, setClosing] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -86,12 +92,21 @@ export default function LeadDetailPage() {
 
   const moveStage = async (stageId: string | null) => {
     if (!lead || !stageId) return;
+    if (lead.closedAt) {
+      notifications.show({
+        color: "red",
+        title: "Lead encerrado",
+        message: "Reabra a jornada antes de mudar o estágio.",
+      });
+      return;
+    }
     try {
-      await api(`/api/v1/leads/${lead.id}/move`, {
+      const payload = await api(`/api/v1/leads/${lead.id}/move`, {
         method: "PATCH",
         body: { stageId },
       });
-      setLead({ ...lead, stageId });
+      const updated = unwrapOne<Lead>(payload, "lead");
+      setLead(updated);
       notifications.show({ color: "green", title: "Estágio atualizado", message: "" });
     } catch (err) {
       notifications.show({
@@ -99,6 +114,54 @@ export default function LeadDetailPage() {
         title: "Erro",
         message: err instanceof ApiError ? err.message : "Falha ao mover.",
       });
+    }
+  };
+
+  const closeLead = async () => {
+    if (!lead || !pendingCloseReason) return;
+    setClosing(true);
+    try {
+      const payload = await api(`/api/v1/leads/${lead.id}/close`, {
+        method: "POST",
+        body: { reason: pendingCloseReason },
+      });
+      setLead(unwrapOne<Lead>(payload, "lead"));
+      setPendingCloseReason(null);
+      notifications.show({
+        color: "green",
+        title: "Jornada encerrada",
+        message: "O lead saiu do Kanban ativo e ficou em Encerrados.",
+      });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao encerrar.",
+      });
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  const reopenLead = async () => {
+    if (!lead) return;
+    setReopening(true);
+    try {
+      const payload = await api(`/api/v1/leads/${lead.id}/reopen`, { method: "POST" });
+      setLead(unwrapOne<Lead>(payload, "lead"));
+      notifications.show({
+        color: "green",
+        title: "Lead reaberto",
+        message: "Voltou ao pipeline ativo.",
+      });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao reabrir.",
+      });
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -202,6 +265,19 @@ export default function LeadDetailPage() {
           </Title>
           <Group gap="sm">
             <TemperatureBadge value={lead.temperature} />
+            {lead.closedAt ? (
+              <Badge
+                variant="light"
+                color={(lead.closedReason || "").toLowerCase() === "converted" ? "green" : "gray"}
+              >
+                Encerrado ·{" "}
+                {(lead.closedReason || "").toLowerCase() === "converted"
+                  ? "Convertido"
+                  : (lead.closedReason || "").toLowerCase() === "lost"
+                    ? "Perdido"
+                    : "Arquivado"}
+              </Badge>
+            ) : null}
             <Text size="sm" c={colors.textMuted}>
               {lead.city || "—"}
               {lead.segment ? ` · ${lead.segment}` : ""}
@@ -235,6 +311,35 @@ export default function LeadDetailPage() {
               Maps
             </Button>
           ) : null}
+          {lead.closedAt ? (
+            <Button
+              variant="light"
+              leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+              loading={reopening}
+              onClick={() => void reopenLead()}
+            >
+              Reabrir
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="light"
+                color="green"
+                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                onClick={() => setPendingCloseReason("converted")}
+              >
+                Converter
+              </Button>
+              <Button
+                variant="light"
+                color="gray"
+                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                onClick={() => setPendingCloseReason("lost")}
+              >
+                Perder
+              </Button>
+            </>
+          )}
           {isAdmin ? (
             <Button
               color="red"
@@ -259,6 +364,12 @@ export default function LeadDetailPage() {
               data={stages.map((s) => ({ value: s.id, label: s.label }))}
               value={lead.stageId}
               onChange={(v) => void moveStage(v)}
+              disabled={Boolean(lead.closedAt)}
+              description={
+                lead.closedAt
+                  ? "Lead encerrado — reabra para alterar o estágio"
+                  : undefined
+              }
             />
             <TextInput label="Telefone" value={lead.phoneE164} readOnly />
             <TextInput label="Cidade" value={lead.city || ""} readOnly />
@@ -427,6 +538,21 @@ export default function LeadDetailPage() {
         loading={deleting}
         title="Excluir lead"
         message={`Tem certeza que deseja excluir "${lead.companyName}"? O lead será removido do CRM e a ação será registrada.`}
+      />
+
+      <ConfirmModal
+        opened={Boolean(pendingCloseReason)}
+        onClose={() => setPendingCloseReason(null)}
+        onConfirm={closeLead}
+        loading={closing}
+        title="Encerrar jornada"
+        message={
+          pendingCloseReason === "converted"
+            ? `Encerrar "${lead.companyName}" como convertido? Sai do Kanban e fica em Leads → Encerrados.`
+            : `Encerrar "${lead.companyName}" como perdido? Sai do Kanban e fica em Leads → Encerrados.`
+        }
+        confirmLabel="Encerrar"
+        danger={pendingCloseReason === "lost"}
       />
     </>
   );
