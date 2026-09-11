@@ -12,6 +12,7 @@ SaaS multi-tenant de **captura de leads** (Google Maps), **qualificação** (fri
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Pré-requisitos](#pré-requisitos)
 - [Setup local](#setup-local)
+- [Inicialização DEV](./INICIALIZACAO-DEV.md)
 - [Credenciais do seed](#credenciais-do-seed)
 - [Scripts](#scripts)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
@@ -66,6 +67,8 @@ orbixlead/
 ---
 
 ## Setup local
+
+Guia detalhado passo a passo: [`INICIALIZACAO-DEV.md`](./INICIALIZACAO-DEV.md).
 
 ```bash
 # 1) Ambiente
