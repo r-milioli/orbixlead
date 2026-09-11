@@ -19,6 +19,7 @@ export type AuthedRequest = Request & {
     emailNotifyInvite: boolean;
     emailNotifyCapture: boolean;
     emailNotifyCredits: boolean;
+    canCapture: boolean;
     createdAt: Date;
   };
 };

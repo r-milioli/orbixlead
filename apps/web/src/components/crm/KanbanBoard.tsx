@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   ActionIcon,
+  Badge,
   Group,
   Menu,
   Paper,
@@ -11,7 +12,7 @@ import {
   Text,
   UnstyledButton,
 } from "@mantine/core";
-import { MessageCircle, MoreHorizontal, Phone } from "lucide-react";
+import { MessageCircle, MoreHorizontal, Phone, UserRound } from "lucide-react";
 import Link from "next/link";
 import type { Lead, PipelineStage } from "@/lib/types";
 import { TemperatureBadge } from "@/components/common/TemperatureBadge";
@@ -143,7 +144,20 @@ export function KanbanBoard({ stages, leadsByStage, onMove }: Props) {
                           {[lead.city, lead.segment].filter(Boolean).join(" · ") || "—"}
                         </Text>
 
-                        <TemperatureBadge value={lead.temperature} />
+                        <Group gap={6} mb={4} wrap="wrap">
+                          <TemperatureBadge value={lead.temperature} />
+                          {lead.assignee ? (
+                            <Badge
+                              size="sm"
+                              variant="light"
+                              color="orbix"
+                              leftSection={<UserRound size={11} />}
+                              style={{ textTransform: "none" }}
+                            >
+                              {lead.assignee.name}
+                            </Badge>
+                          ) : null}
+                        </Group>
 
                         <Group gap={6} mt="sm">
                           <ActionIcon

@@ -21,6 +21,7 @@ export type AuthUser = {
   emailNotifyInvite?: boolean;
   emailNotifyCapture?: boolean;
   emailNotifyCredits?: boolean;
+  canCapture?: boolean;
 };
 
 export type TenantCredits = {

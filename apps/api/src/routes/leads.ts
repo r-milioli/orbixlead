@@ -50,10 +50,12 @@ function serializeLead(lead: {
   notes: string | null;
   closedAt: Date | null;
   closedReason: LeadClosedReason | null;
+  assigneeId?: string | null;
   softDeletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   stage?: { id: string; slug: string; label: string };
+  assignee?: { id: string; name: string; email: string } | null;
 }) {
   return {
     id: lead.id,
@@ -79,11 +81,20 @@ function serializeLead(lead: {
     notes: lead.notes,
     closedAt: lead.closedAt?.toISOString() ?? null,
     closedReason: lead.closedReason ? closedReasonToApi[lead.closedReason] : null,
+    assigneeId: lead.assigneeId ?? null,
+    assignee: lead.assignee
+      ? { id: lead.assignee.id, name: lead.assignee.name, email: lead.assignee.email }
+      : null,
     softDeletedAt: lead.softDeletedAt?.toISOString() ?? null,
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
   };
 }
+
+const leadInclude = {
+  stage: true,
+  assignee: { select: { id: true, name: true, email: true } },
+} as const;
 
 router.use(requireAuth, requireTenant, requireRole(Role.ADMIN, Role.OPERADOR));
 
@@ -93,7 +104,7 @@ router.get(
   asyncHandler(async (req: AuthedRequest, res) => {
     const leads = await prisma.lead.findMany({
       where: { tenantId: req.user!.tenantId!, softDeletedAt: null },
-      include: { stage: true },
+      include: leadInclude,
       orderBy: { createdAt: "desc" },
     });
 
@@ -167,7 +178,7 @@ router.get(
             }
           : {}),
       },
-      include: { stage: true },
+      include: leadInclude,
       orderBy: status === "closed" ? { closedAt: "desc" } : { updatedAt: "desc" },
       take: 500,
     });
@@ -180,7 +191,7 @@ router.get(
   asyncHandler(async (req: AuthedRequest, res) => {
     const lead = await prisma.lead.findFirst({
       where: { id: req.params.id, tenantId: req.user!.tenantId!, softDeletedAt: null },
-      include: { stage: true, schedules: { orderBy: { scheduledAt: "asc" } } },
+      include: { ...leadInclude, schedules: { orderBy: { scheduledAt: "asc" } } },
     });
     if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
     return res.json({
@@ -191,6 +202,8 @@ router.get(
           scheduledAt: s.scheduledAt.toISOString(),
           reason: s.reason,
           notes: s.notes,
+          status: s.status.toLowerCase(),
+          cancelledAt: s.cancelledAt?.toISOString() ?? null,
         })),
       },
     });
@@ -268,7 +281,7 @@ router.post(
           segment: body.segment,
           notes: body.notes,
         },
-        include: { stage: true },
+        include: leadInclude,
       });
       return res.status(201).json({ lead: serializeLead(lead) });
     } catch (err: unknown) {
@@ -316,7 +329,7 @@ router.post(
           closedAt: new Date(),
           closedReason,
         },
-        include: { stage: true },
+        include: leadInclude,
       });
       await tx.auditLog.create({
         data: {
@@ -325,12 +338,120 @@ router.post(
           action: "lead_close",
           entity: "Lead",
           entityId: lead.id,
-          meta: { reason: body.reason, companyName: lead.companyName },
+          meta: {
+            reason: body.reason,
+            companyName: lead.companyName,
+            assigneeId: lead.assigneeId,
+          },
         },
       });
       return next;
     });
 
+    return res.json({ lead: serializeLead(updated) });
+  })
+);
+
+router.patch(
+  "/:id/assignee",
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = z
+      .object({
+        assigneeId: z.string().nullable(),
+      })
+      .parse(req.body);
+
+    const tenantId = req.user!.tenantId!;
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId, softDeletedAt: null },
+    });
+    if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
+    if (lead.closedAt) {
+      return res.status(400).json({
+        error: "Lead encerrado — reabra antes de alterar o acompanhamento",
+      });
+    }
+
+    const isAdmin = req.user!.role === Role.ADMIN;
+    const currentAssigneeId = lead.assigneeId;
+
+    if (body.assigneeId === null) {
+      if (!currentAssigneeId) {
+        const current = await prisma.lead.findFirstOrThrow({
+          where: { id: lead.id },
+          include: leadInclude,
+        });
+        return res.json({ lead: serializeLead(current) });
+      }
+      if (!isAdmin && currentAssigneeId !== req.user!.id) {
+        return res.status(403).json({
+          error: "Somente o operador responsável ou um admin pode liberar o acompanhamento",
+        });
+      }
+
+      const updated = await prisma.lead.update({
+        where: { id: lead.id },
+        data: { assigneeId: null },
+        include: leadInclude,
+      });
+      await prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId: req.user!.id,
+          action: "lead_assignee_release",
+          entity: "Lead",
+          entityId: lead.id,
+          meta: { previousAssigneeId: currentAssigneeId },
+        },
+      });
+      return res.json({ lead: serializeLead(updated) });
+    }
+
+    const target = await prisma.user.findFirst({
+      where: { id: body.assigneeId, tenantId, role: Role.OPERADOR },
+    });
+    if (!target) {
+      return res.status(400).json({ error: "Operador inválido" });
+    }
+
+    if (currentAssigneeId && currentAssigneeId !== body.assigneeId && !isAdmin) {
+      return res.status(403).json({
+        error: "Este lead já está sendo acompanhado por outro operador",
+      });
+    }
+
+    if (!currentAssigneeId && !isAdmin && body.assigneeId !== req.user!.id) {
+      return res.status(403).json({
+        error: "Você só pode assumir o acompanhamento para si",
+      });
+    }
+
+    if (currentAssigneeId === body.assigneeId) {
+      const current = await prisma.lead.findFirstOrThrow({
+        where: { id: lead.id },
+        include: leadInclude,
+      });
+      return res.json({ lead: serializeLead(current) });
+    }
+
+    const updated = await prisma.lead.update({
+      where: { id: lead.id },
+      data: { assigneeId: target.id },
+      include: leadInclude,
+    });
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: req.user!.id,
+        action: currentAssigneeId ? "lead_assignee_change" : "lead_assignee_claim",
+        entity: "Lead",
+        entityId: lead.id,
+        meta: {
+          previousAssigneeId: currentAssigneeId,
+          assigneeId: target.id,
+        },
+      },
+    });
     return res.json({ lead: serializeLead(updated) });
   })
 );
@@ -358,7 +479,7 @@ router.post(
           closedReason: null,
           ...(followUp ? { stageId: followUp.id } : {}),
         },
-        include: { stage: true },
+        include: leadInclude,
       });
       await tx.auditLog.create({
         data: {
@@ -397,7 +518,7 @@ router.patch(
     const updated = await prisma.lead.update({
       where: { id: lead.id },
       data: { stageId: stage.id },
-      include: { stage: true },
+      include: leadInclude,
     });
     return res.json({ lead: serializeLead(updated) });
   })
@@ -434,7 +555,7 @@ router.patch(
         ...(body.notes !== undefined ? { notes: body.notes } : {}),
         ...(body.stageId ? { stageId: body.stageId } : {}),
       },
-      include: { stage: true },
+      include: leadInclude,
     });
     return res.json({ lead: serializeLead(updated) });
   })

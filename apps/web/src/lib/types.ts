@@ -26,6 +26,8 @@ export type Lead = {
   stage?: PipelineStage;
   closedAt?: string | null;
   closedReason?: "converted" | "lost" | "CONVERTED" | "LOST" | null;
+  assigneeId?: string | null;
+  assignee?: { id: string; name: string; email: string } | null;
   softDeletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -84,14 +86,20 @@ export type ScheduleItem = {
   scheduledAt: string;
   reason: string;
   notes?: string | null;
+  status?: "scheduled" | "cancelled" | "SCHEDULED" | "CANCELLED";
+  cancelledAt?: string | null;
   lead?: Pick<Lead, "id" | "companyName" | "phoneE164">;
   createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Goal = {
   id: string;
   name: string;
   periodType: "MONTHLY" | "WEEKLY" | "DAILY" | "monthly" | "weekly" | "daily";
+  scope?: "company" | "operator" | "COMPANY" | "OPERATOR";
+  assigneeId?: string | null;
+  assignee?: { id: string; name: string; email: string } | null;
   parentId?: string | null;
   year: number;
   month?: number | null;

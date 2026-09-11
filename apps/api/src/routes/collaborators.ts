@@ -35,6 +35,35 @@ router.get(
   })
 );
 
+router.patch(
+  "/:id",
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const body = z
+      .object({
+        canCapture: z.boolean().optional(),
+      })
+      .parse(req.body);
+
+    const target = await prisma.user.findFirst({
+      where: { id: req.params.id, tenantId: req.user!.tenantId! },
+    });
+    if (!target) return res.status(404).json({ error: "Colaborador não encontrado" });
+
+    if (body.canCapture !== undefined && target.role !== Role.OPERADOR) {
+      return res.status(400).json({ error: "Permissão de captura só se aplica a operadores" });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: target.id },
+      data: {
+        ...(body.canCapture !== undefined ? { canCapture: body.canCapture } : {}),
+      },
+    });
+
+    return res.json({ user: serializeUser(user) });
+  })
+);
+
 router.post(
   "/invite",
   asyncHandler(async (req: AuthedRequest, res) => {

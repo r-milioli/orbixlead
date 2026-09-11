@@ -24,7 +24,7 @@ import {
 } from "@mantine/core";
 import { DateTimePicker } from "@mantine/dates";
 import { notifications } from "@mantine/notifications";
-import { ArrowLeft, Archive, Globe, MapPin, MessageCircle, Phone, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, Archive, Globe, MapPin, MessageCircle, Phone, RotateCcw, Trash2, UserRound } from "lucide-react";
 import dayjs from "dayjs";
 import { TemperatureBadge } from "@/components/common/TemperatureBadge";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
@@ -43,10 +43,11 @@ function websiteHref(url: string): string {
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin, isOperador } = useAuth();
   const [lead, setLead] = useState<Lead | null>(null);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [operators, setOperators] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [waOpen, setWaOpen] = useState(false);
   const [notes, setNotes] = useState("");
@@ -61,6 +62,8 @@ export default function LeadDetailPage() {
   );
   const [closing, setClosing] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [confirmReleaseOpen, setConfirmReleaseOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -89,6 +92,46 @@ export default function LeadDetailPage() {
   useEffect(() => {
     void load();
   }, [params.id]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      try {
+        const data = await api<{ users: { id: string; name: string; role: string }[] }>(
+          "/api/v1/collaborators"
+        );
+        setOperators((data.users || []).filter((u) => u.role === "operador"));
+      } catch {
+        setOperators([]);
+      }
+    })();
+  }, [isAdmin]);
+
+  const setAssignee = async (assigneeId: string | null) => {
+    if (!lead) return;
+    setAssigning(true);
+    try {
+      const payload = await api(`/api/v1/leads/${lead.id}/assignee`, {
+        method: "PATCH",
+        body: { assigneeId },
+      });
+      setLead(unwrapOne<Lead>(payload, "lead"));
+      setConfirmReleaseOpen(false);
+      notifications.show({
+        color: "green",
+        title: assigneeId ? "Acompanhamento atualizado" : "Acompanhamento liberado",
+        message: "",
+      });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao atualizar acompanhamento.",
+      });
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const moveStage = async (stageId: string | null) => {
     if (!lead || !stageId) return;
@@ -371,6 +414,84 @@ export default function LeadDetailPage() {
                   : undefined
               }
             />
+
+            <div>
+              <Text size="sm" fw={600} mb={6}>
+                Acompanhado por
+              </Text>
+              {lead.assignee ? (
+                <Group gap="xs" mb={8}>
+                  <Badge
+                    variant="light"
+                    color="orbix"
+                    leftSection={<UserRound size={12} />}
+                  >
+                    {lead.assignee.name}
+                  </Badge>
+                  {lead.assigneeId === user?.id ? (
+                    <Text size="xs" c={colors.textMuted}>
+                      (você)
+                    </Text>
+                  ) : null}
+                </Group>
+              ) : (
+                <Text size="sm" c={colors.textMuted} mb={8}>
+                  Ninguém — disponível para assumir
+                </Text>
+              )}
+
+              {!lead.closedAt ? (
+                <Stack gap="xs">
+                  {isAdmin ? (
+                    <Select
+                      placeholder="Definir operador"
+                      searchable
+                      clearable
+                      data={operators.map((o) => ({ value: o.id, label: o.name }))}
+                      value={lead.assigneeId ?? null}
+                      disabled={assigning}
+                      onChange={(v) => void setAssignee(v)}
+                      description="Somente admin pode trocar o operador responsável"
+                    />
+                  ) : null}
+
+                  {isOperador && !lead.assigneeId ? (
+                    <Button
+                      size="xs"
+                      variant="light"
+                      loading={assigning}
+                      leftSection={<UserRound size={14} />}
+                      onClick={() => void setAssignee(user!.id)}
+                      w="fit-content"
+                    >
+                      Assumir acompanhamento
+                    </Button>
+                  ) : null}
+
+                  {isOperador && lead.assigneeId === user?.id ? (
+                    <Button
+                      size="xs"
+                      variant="default"
+                      loading={assigning}
+                      onClick={() => setConfirmReleaseOpen(true)}
+                      w="fit-content"
+                    >
+                      Liberar acompanhamento
+                    </Button>
+                  ) : null}
+
+                  {isOperador &&
+                  lead.assigneeId &&
+                  lead.assigneeId !== user?.id ? (
+                    <Text size="xs" c={colors.textMuted}>
+                      Outro operador já acompanha este lead. Só ele pode liberar, ou um
+                      admin pode reatribuir.
+                    </Text>
+                  ) : null}
+                </Stack>
+              ) : null}
+            </div>
+
             <TextInput label="Telefone" value={lead.phoneE164} readOnly />
             <TextInput label="Cidade" value={lead.city || ""} readOnly />
             <TextInput label="Endereço" value={lead.address || ""} readOnly />
@@ -506,21 +627,100 @@ export default function LeadDetailPage() {
             </Text>
           ) : (
             <Stack gap="sm">
-              {schedules.map((s) => (
-                <Card key={s.id} padding="sm" withBorder shadow="none">
-                  <Text size="sm" fw={600}>
-                    {dayjs(s.scheduledAt).format("DD/MM/YYYY HH:mm")}
-                  </Text>
-                  <Text size="sm">{s.reason}</Text>
-                  {s.notes ? (
-                    <Text size="xs" c={colors.textMuted}>
-                      {s.notes}
-                    </Text>
-                  ) : null}
-                </Card>
-              ))}
+              {schedules.map((s) => {
+                const cancelled = (s.status || "").toLowerCase() === "cancelled";
+                return (
+                  <Card key={s.id} padding="sm" withBorder shadow="none">
+                    <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
+                      <div style={{ minWidth: 0 }}>
+                        <Group gap={8} mb={4}>
+                          <Text
+                            size="sm"
+                            fw={600}
+                            style={{ textDecoration: cancelled ? "line-through" : undefined }}
+                          >
+                            {dayjs(s.scheduledAt).format("DD/MM/YYYY HH:mm")}
+                          </Text>
+                          {cancelled ? (
+                            <Text size="xs" c={colors.textMuted}>
+                              Cancelado
+                            </Text>
+                          ) : null}
+                        </Group>
+                        <Text size="sm">{s.reason}</Text>
+                        {s.notes ? (
+                          <Text size="xs" c={colors.textMuted}>
+                            {s.notes}
+                          </Text>
+                        ) : null}
+                      </div>
+                      <Group gap={4} wrap="nowrap">
+                        {!cancelled ? (
+                          <Button
+                            size="compact-xs"
+                            variant="subtle"
+                            onClick={async () => {
+                              try {
+                                const payload = await api(`/api/v1/schedules/${s.id}/cancel`, {
+                                  method: "POST",
+                                });
+                                const updated = unwrapOne<ScheduleItem>(payload, "schedule");
+                                setSchedules((prev) =>
+                                  prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x))
+                                );
+                                notifications.show({
+                                  color: "gray",
+                                  title: "Cancelado",
+                                  message: "Agendamento cancelado.",
+                                });
+                              } catch (err) {
+                                notifications.show({
+                                  color: "red",
+                                  title: "Erro",
+                                  message:
+                                    err instanceof ApiError ? err.message : "Falha ao cancelar.",
+                                });
+                              }
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          color="red"
+                          onClick={async () => {
+                            try {
+                              await api(`/api/v1/schedules/${s.id}`, { method: "DELETE" });
+                              setSchedules((prev) => prev.filter((x) => x.id !== s.id));
+                              notifications.show({
+                                color: "green",
+                                title: "Excluído",
+                                message: "Agendamento removido.",
+                              });
+                            } catch (err) {
+                              notifications.show({
+                                color: "red",
+                                title: "Erro",
+                                message:
+                                  err instanceof ApiError ? err.message : "Falha ao excluir.",
+                              });
+                            }
+                          }}
+                        >
+                          Excluir
+                        </Button>
+                      </Group>
+                    </Group>
+                  </Card>
+                );
+              })}
             </Stack>
           )}
+          <Text size="xs" c={colors.textMuted} mt="sm">
+            Para editar ou reagendar, use a página Agenda.
+          </Text>
         </Card>
       </SimpleGrid>
 
@@ -529,6 +729,17 @@ export default function LeadDetailPage() {
         onClose={() => setWaOpen(false)}
         phoneE164={lead.phoneE164}
         companyName={lead.companyName}
+      />
+
+      <ConfirmModal
+        opened={confirmReleaseOpen}
+        onClose={() => setConfirmReleaseOpen(false)}
+        onConfirm={() => setAssignee(null)}
+        loading={assigning}
+        title="Liberar acompanhamento"
+        message={`Liberar o lead "${lead.companyName}"? Ele ficará disponível para qualquer operador assumir.`}
+        confirmLabel="Liberar"
+        danger={false}
       />
 
       <ConfirmModal
@@ -545,13 +756,15 @@ export default function LeadDetailPage() {
         onClose={() => setPendingCloseReason(null)}
         onConfirm={closeLead}
         loading={closing}
-        title="Encerrar jornada"
+        title={pendingCloseReason === "converted" ? "Converter lead" : "Encerrar jornada"}
         message={
           pendingCloseReason === "converted"
-            ? `Encerrar "${lead.companyName}" como convertido? Sai do Kanban e fica em Leads → Encerrados.`
+            ? lead.assignee
+              ? `Encerrar "${lead.companyName}" como convertido?\n\nA conversão será contabilizada na meta individual de ${lead.assignee.name} e também na meta da empresa.`
+              : `Encerrar "${lead.companyName}" como convertido?\n\nNão há operador acompanhando este lead. A conversão contará apenas na meta da empresa (sem crédito individual).`
             : `Encerrar "${lead.companyName}" como perdido? Sai do Kanban e fica em Leads → Encerrados.`
         }
-        confirmLabel="Encerrar"
+        confirmLabel={pendingCloseReason === "converted" ? "Converter" : "Encerrar"}
         danger={pendingCloseReason === "lost"}
       />
     </>

@@ -33,6 +33,7 @@ type AdvancedFilters = {
   segment: string;
   stageId: string | null;
   site: "all" | "with" | "without";
+  accompaniedByMe: boolean;
 };
 
 const DEFAULT_FILTERS: AdvancedFilters = {
@@ -41,10 +42,11 @@ const DEFAULT_FILTERS: AdvancedFilters = {
   segment: "",
   stageId: null,
   site: "all",
+  accompaniedByMe: false,
 };
 
 export default function CrmPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,9 +100,12 @@ export default function CrmPage() {
       }
       if (appliedFilters.site === "with" && !(lead.hasWebsite || lead.website)) return false;
       if (appliedFilters.site === "without" && (lead.hasWebsite || lead.website)) return false;
+      if (appliedFilters.accompaniedByMe) {
+        if (!user?.id || lead.assigneeId !== user.id) return false;
+      }
       return true;
     });
-  }, [allLeads, appliedFilters]);
+  }, [allLeads, appliedFilters, user?.id]);
 
   const leadsByStage = useMemo(() => {
     const grouped: Record<string, Lead[]> = {};
@@ -185,7 +190,8 @@ export default function CrmPage() {
     (appliedFilters.city ? 1 : 0) +
     (appliedFilters.segment ? 1 : 0) +
     (appliedFilters.stageId ? 1 : 0) +
-    (appliedFilters.site !== "all" ? 1 : 0);
+    (appliedFilters.site !== "all" ? 1 : 0) +
+    (appliedFilters.accompaniedByMe ? 1 : 0);
 
   return (
     <>
@@ -321,6 +327,18 @@ export default function CrmPage() {
               }))
             }
             allowDeselect={false}
+          />
+
+          <Checkbox
+            label="Acompanhado por mim"
+            description="Mostra apenas leads sob o seu acompanhamento"
+            checked={draftFilters.accompaniedByMe}
+            onChange={() => {
+              setDraftFilters((prev) => ({
+                ...prev,
+                accompaniedByMe: !prev.accompaniedByMe,
+              }));
+            }}
           />
 
           <Group justify="space-between" mt="md">

@@ -1,19 +1,20 @@
 import { Router } from "express";
 import { creditUiState, KNOWN_PIPELINE_SLUGS } from "@orbixlead/shared";
-import { GoalPeriodType, Role } from "@prisma/client";
+import { GoalPeriodType, GoalScope, LeadClosedReason, Role } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
 
 const router = Router();
 
-router.use(requireAuth, requireTenant, requireRole(Role.ADMIN));
+router.use(requireAuth, requireTenant, requireRole(Role.ADMIN, Role.OPERADOR));
 
 router.get(
   "/metrics",
   asyncHandler(async (req: AuthedRequest, res) => {
     const tenantId = req.user!.tenantId!;
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
+    const goalId = typeof req.query.goalId === "string" ? req.query.goalId.trim() : "";
 
     const stages = await prisma.pipelineStage.findMany({
       where: { tenantId, slug: { in: [...KNOWN_PIPELINE_SLUGS] } },
@@ -49,7 +50,7 @@ router.get(
       convertedLast7Days,
       importedToday,
       advancedToday,
-      monthlyGoal,
+      monthlyGoalsRaw,
     ] = await Promise.all([
       convertedStage
         ? prisma.lead.count({
@@ -100,23 +101,62 @@ router.get(
           ...(newStage ? { NOT: { stageId: newStage.id } } : {}),
         },
       }),
-      prisma.goal.findFirst({
+      prisma.goal.findMany({
         where: {
           tenantId,
           periodType: GoalPeriodType.MONTHLY,
           year: now.getFullYear(),
           month: now.getMonth() + 1,
           parentId: null,
+          ...(req.user!.role === Role.OPERADOR
+            ? {
+                OR: [
+                  { scope: GoalScope.COMPANY },
+                  { scope: GoalScope.OPERATOR, assigneeId: req.user!.id },
+                ],
+              }
+            : {}),
         },
         orderBy: { createdAt: "desc" },
       }),
     ]);
+
+    const monthlyGoals = monthlyGoalsRaw;
+    let monthlyGoal =
+      (goalId ? monthlyGoals.find((g) => g.id === goalId) : undefined) ?? null;
+    if (!monthlyGoal) {
+      if (req.user!.role === Role.OPERADOR) {
+        monthlyGoal =
+          monthlyGoals.find(
+            (g) => g.scope === GoalScope.OPERATOR && g.assigneeId === req.user!.id
+          ) ??
+          monthlyGoals.find((g) => g.scope === GoalScope.COMPANY) ??
+          monthlyGoals[0] ??
+          null;
+      } else {
+        monthlyGoal =
+          monthlyGoals.find((g) => g.scope === GoalScope.COMPANY) ?? monthlyGoals[0] ?? null;
+      }
+    }
 
     const avgLeadCost = tenant.avgLeadCost ? Number(tenant.avgLeadCost) : 0;
     const costPerConversion =
       convertedThisMonth > 0 ? (importedThisMonth * avgLeadCost) / convertedThisMonth : null;
     const conversionRate =
       leadsLast7Days > 0 ? convertedLast7Days / leadsLast7Days : 0;
+
+    const goalConversions =
+      monthlyGoal?.scope === GoalScope.OPERATOR && monthlyGoal.assigneeId
+        ? await prisma.lead.count({
+            where: {
+              tenantId,
+              softDeletedAt: null,
+              closedReason: LeadClosedReason.CONVERTED,
+              closedAt: { gte: monthStart },
+              assigneeId: monthlyGoal.assigneeId,
+            },
+          })
+        : convertedThisMonth;
 
     const bySegment = convertedStage
       ? await prisma.lead.groupBy({
@@ -181,7 +221,7 @@ router.get(
     }
 
     const goalTarget = monthlyGoal?.targetConversions ?? 0;
-    const goalProgress = goalTarget > 0 ? Math.min(1, convertedThisMonth / goalTarget) : 0;
+    const goalProgress = goalTarget > 0 ? Math.min(1, goalConversions / goalTarget) : 0;
 
     return res.json({
       metrics: {
@@ -214,10 +254,18 @@ router.get(
               id: monthlyGoal.id,
               name: monthlyGoal.name,
               target: goalTarget,
-              current: convertedThisMonth,
+              current: goalConversions,
               progress: goalProgress,
+              scope: monthlyGoal.scope === GoalScope.COMPANY ? "company" : "operator",
+              assigneeId: monthlyGoal.assigneeId,
             }
           : null,
+        availableGoals: monthlyGoals.map((g) => ({
+          id: g.id,
+          name: g.name,
+          scope: g.scope === GoalScope.COMPANY ? "company" : "operator",
+          assigneeId: g.assigneeId,
+        })),
         prospection30d,
         conversionsBySegment: bySegment.map((row) => ({
           segment: row.segment ?? "sem_segmento",

@@ -21,6 +21,7 @@ export function serializeUser(user: {
   emailNotifyInvite: boolean;
   emailNotifyCapture: boolean;
   emailNotifyCredits: boolean;
+  canCapture: boolean;
   createdAt: Date;
 }) {
   return {
@@ -32,6 +33,7 @@ export function serializeUser(user: {
     emailNotifyInvite: user.emailNotifyInvite,
     emailNotifyCapture: user.emailNotifyCapture,
     emailNotifyCredits: user.emailNotifyCredits,
+    canCapture: user.canCapture,
     createdAt: user.createdAt.toISOString(),
   };
 }

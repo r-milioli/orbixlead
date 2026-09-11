@@ -51,6 +51,7 @@ type NavItem = {
   href: string;
   icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
   roles: Role[];
+  requiresCapture?: boolean;
 };
 
 type NavGroup = {
@@ -78,7 +79,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
-        roles: ["admin"],
+        roles: ["admin", "operador"],
       },
     ],
   },
@@ -91,6 +92,7 @@ const NAV_GROUPS: NavGroup[] = [
         href: "/captura",
         icon: Search,
         roles: ["admin", "operador"],
+        requiresCapture: true,
       },
       {
         label: "Leads",
@@ -132,7 +134,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Metas",
         href: "/metas",
         icon: Target,
-        roles: ["admin"],
+        roles: ["admin", "operador"],
       },
     ],
   },
@@ -143,7 +145,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Configurações",
         href: "/configuracoes",
         icon: Settings,
-        roles: ["admin"],
+        roles: ["admin", "operador"],
       },
     ],
   },
@@ -265,12 +267,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notifLoading, setNotifLoading] = useState(false);
 
   const role = user?.role;
+  const canCapture = role === "admin" || user?.canCapture !== false;
   const navGroups = useMemo(() => {
     return NAV_GROUPS.map((group) => ({
       ...group,
-      items: group.items.filter((item) => (role ? item.roles.includes(role) : false)),
+      items: group.items.filter((item) => {
+        if (!role || !item.roles.includes(role)) return false;
+        if (item.requiresCapture && !canCapture) return false;
+        return true;
+      }),
     })).filter((group) => group.items.length > 0);
-  }, [role]);
+  }, [role, canCapture]);
+
+  useEffect(() => {
+    if (pathname.startsWith("/captura") && role === "operador" && user?.canCapture === false) {
+      router.replace("/dashboard");
+    }
+  }, [pathname, role, user?.canCapture, router]);
 
   const sidebarCollapsed = collapsed && !isMobile;
   const sidebarWidth = sidebarCollapsed ? layout.sidebarCollapsed : layout.sidebarExpanded;
@@ -612,7 +625,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>{user?.email}</Menu.Label>
-                {user?.role === "admin" ? (
+                {user?.role === "admin" || user?.role === "operador" ? (
                   <Menu.Item
                     leftSection={<Settings size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
                     onClick={() => router.push("/configuracoes")}

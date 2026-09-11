@@ -36,7 +36,11 @@ export function ConfirmModal({
       overlayProps={{ backgroundOpacity: 0.45 }}
     >
       <Stack gap="lg">
-        <Text size="sm" c={colors.textSecondary} style={{ lineHeight: 1.5 }}>
+        <Text
+          size="sm"
+          c={colors.textSecondary}
+          style={{ lineHeight: 1.5, whiteSpace: "pre-line" }}
+        >
           {message}
         </Text>
         <Group justify="flex-end" gap="sm">

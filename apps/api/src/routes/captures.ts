@@ -18,6 +18,12 @@ const tempToApi: Record<Temperature, string> = {
 
 router.use(requireAuth, requireTenant, requireRole(Role.ADMIN, Role.OPERADOR));
 
+function requireCanCapture(req: AuthedRequest, res: import("express").Response, next: import("express").NextFunction) {
+  if (req.user!.role === Role.ADMIN) return next();
+  if (req.user!.role === Role.OPERADOR && req.user!.canCapture) return next();
+  return res.status(403).json({ error: "Sem permissão para captura de leads" });
+}
+
 router.get(
   "/results",
   asyncHandler(async (req: AuthedRequest, res) => {
@@ -136,6 +142,7 @@ router.get(
 
 router.post(
   "/",
+  requireCanCapture,
   asyncHandler(async (req: AuthedRequest, res) => {
     const body = z
       .object({
@@ -205,6 +212,7 @@ router.post(
 
 router.post(
   "/:id/cancel",
+  requireCanCapture,
   asyncHandler(async (req: AuthedRequest, res) => {
     const job = await prisma.scrapingJob.findFirst({
       where: { id: req.params.id, tenantId: req.user!.tenantId! },

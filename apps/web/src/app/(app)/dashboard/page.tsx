@@ -9,6 +9,7 @@ import {
   Card,
   Grid,
   Group,
+  Select,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -18,6 +19,7 @@ import {
 import { Download, LayoutDashboard, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
@@ -44,7 +46,15 @@ type MetricsResponse = {
       target: number;
       current: number;
       progress: number;
+      scope?: string;
+      assigneeId?: string | null;
     } | null;
+    availableGoals?: {
+      id: string;
+      name: string;
+      scope: string;
+      assigneeId?: string | null;
+    }[];
     prospection30d: { day: string; imported: number; converted: number }[];
     conversionsBySegment: { segment: string; count: number }[];
     upcomingSchedules: number;
@@ -112,16 +122,27 @@ function SectionHead({ title, subtitle }: { title: string; subtitle?: string }) 
 }
 
 export default function DashboardPage() {
+  const { user, isAdmin, isOperador } = useAuth();
   const [data, setData] = useState<MetricsResponse["metrics"] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+
+  const canCapture = isAdmin || user?.canCapture !== false;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
       try {
-        const res = await api<MetricsResponse>("/api/v1/dashboard/metrics");
-        if (!cancelled) setData(res.metrics);
+        const qs = selectedGoalId ? `?goalId=${encodeURIComponent(selectedGoalId)}` : "";
+        const res = await api<MetricsResponse>(`/api/v1/dashboard/metrics${qs}`);
+        if (!cancelled) {
+          setData(res.metrics);
+          if (!selectedGoalId && res.metrics.goal?.id) {
+            setSelectedGoalId(res.metrics.goal.id);
+          }
+        }
       } catch {
         if (!cancelled) setError("Não foi possível carregar o dashboard.");
       } finally {
@@ -131,13 +152,15 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selectedGoalId]);
 
   const funnel = data?.funnel ?? [];
   const maxFunnel = Math.max(1, ...funnel.map((f) => f.count), 1);
   const totalFunnel = funnel.reduce((sum, f) => sum + f.count, 0) || 1;
   const kpis = data?.kpis;
   const goal = data?.goal;
+  const availableGoals = data?.availableGoals ?? [];
+  const showGoalSelector = isOperador && availableGoals.length > 1;
 
   const chartData = (data?.prospection30d ?? []).map((d) => ({
     day: d.day,
@@ -160,17 +183,35 @@ export default function DashboardPage() {
             >
               Exportar
             </Button>
-            <Button
-              leftSection={<Plus size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-              component={Link}
-              href="/captura"
-            >
-              Nova captura
-            </Button>
+            {canCapture ? (
+              <Button
+                leftSection={<Plus size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                component={Link}
+                href="/captura"
+              >
+                Nova captura
+              </Button>
+            ) : null}
           </>
         }
       />
 
+      {showGoalSelector ? (
+        <Select
+          mb="md"
+          maw={360}
+          label="Meta em acompanhamento"
+          data={availableGoals.map((g) => ({
+            value: g.id,
+            label:
+              g.scope === "operator"
+                ? `Minha meta · ${g.name}`
+                : `Empresa · ${g.name}`,
+          }))}
+          value={selectedGoalId}
+          onChange={setSelectedGoalId}
+        />
+      ) : null}
       {loading ? (
         <Stack gap={16}>
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>

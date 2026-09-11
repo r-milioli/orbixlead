@@ -7,6 +7,7 @@ import {
   Card,
   Group,
   NumberInput,
+  PasswordInput,
   Select,
   SimpleGrid,
   Stack,
@@ -40,6 +41,7 @@ type CollaboratorUser = {
   name: string;
   email: string;
   role: string;
+  canCapture?: boolean;
 };
 
 type InviteRow = {
@@ -50,7 +52,7 @@ type InviteRow = {
 };
 
 export default function ConfiguracoesPage() {
-  const { user, refresh, setTenant, tenant } = useAuth();
+  const { user, refresh, setTenant, tenant, isAdmin } = useAuth();
   const [tab, setTab] = useState<string | null>("perfil");
 
   const [name, setName] = useState("");
@@ -58,6 +60,11 @@ export default function ConfiguracoesPage() {
   const [emailNotifyInvite, setEmailNotifyInvite] = useState(true);
   const [emailNotifyCapture, setEmailNotifyCapture] = useState(true);
   const [emailNotifyCredits, setEmailNotifyCredits] = useState(true);
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const [users, setUsers] = useState<CollaboratorUser[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
@@ -88,7 +95,7 @@ export default function ConfiguracoesPage() {
         if (typeof s.emailPrefs?.emailNotifyCredits === "boolean") {
           setEmailNotifyCredits(s.emailPrefs.emailNotifyCredits);
         }
-        if (tenant) {
+        if (isAdmin && tenant) {
           setTenant({
             ...tenant,
             avgLeadCost: s.avgLeadCost ?? tenant.avgLeadCost,
@@ -98,6 +105,7 @@ export default function ConfiguracoesPage() {
         /* use defaults */
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
   }, []);
 
   const loadCollaborators = async () => {
@@ -117,8 +125,14 @@ export default function ConfiguracoesPage() {
   };
 
   useEffect(() => {
-    if (tab === "colaboradores") void loadCollaborators();
-  }, [tab]);
+    if (isAdmin && tab === "colaboradores") void loadCollaborators();
+  }, [tab, isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin && (tab === "colaboradores" || tab === "notificacoes")) {
+      setTab("perfil");
+    }
+  }, [isAdmin, tab]);
 
   const saveProfile = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -128,7 +142,7 @@ export default function ConfiguracoesPage() {
         method: "PATCH",
         body: {
           name: name.trim(),
-          avgLeadCost: Number(avgLeadCost),
+          ...(isAdmin ? { avgLeadCost: Number(avgLeadCost) } : {}),
         },
       });
       await refresh();
@@ -145,6 +159,49 @@ export default function ConfiguracoesPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const savePassword = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (newPassword.length < 8) {
+      notifications.show({
+        color: "red",
+        title: "Senha inválida",
+        message: "A nova senha deve ter pelo menos 8 caracteres.",
+      });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      notifications.show({
+        color: "red",
+        title: "Senhas diferentes",
+        message: "A confirmação não confere com a nova senha.",
+      });
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await api("/api/v1/settings/password", {
+        method: "POST",
+        body: { currentPassword, newPassword },
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      notifications.show({
+        color: "green",
+        title: "Senha atualizada",
+        message: "Sua senha foi alterada com sucesso.",
+      });
+    } catch (err) {
+      notifications.show({
+        color: "red",
+        title: "Erro",
+        message: err instanceof ApiError ? err.message : "Falha ao alterar a senha.",
+      });
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -231,13 +288,17 @@ export default function ConfiguracoesPage() {
     <>
       <PageHeader
         title="Configurações"
-        subtitle="Gerencie seu perfil e preferências da conta."
+        subtitle={
+          isAdmin
+            ? "Gerencie seu perfil e preferências da conta."
+            : "Atualize seu nome e senha de acesso."
+        }
         actions={
           tab === "perfil" ? (
             <Button loading={saving} onClick={() => void saveProfile()}>
               Salvar alterações
             </Button>
-          ) : tab === "notificacoes" ? (
+          ) : tab === "notificacoes" && isAdmin ? (
             <Button loading={saving} onClick={() => void saveNotifications()}>
               Salvar alterações
             </Button>
@@ -249,8 +310,8 @@ export default function ConfiguracoesPage() {
         <Tabs value={tab} onChange={setTab} color="orbix">
           <Tabs.List mb="lg">
             <Tabs.Tab value="perfil">Meu perfil</Tabs.Tab>
-            <Tabs.Tab value="colaboradores">Colaboradores</Tabs.Tab>
-            <Tabs.Tab value="notificacoes">Notificações</Tabs.Tab>
+            {isAdmin ? <Tabs.Tab value="colaboradores">Colaboradores</Tabs.Tab> : null}
+            {isAdmin ? <Tabs.Tab value="notificacoes">Notificações</Tabs.Tab> : null}
           </Tabs.List>
 
           <Tabs.Panel value="perfil">
@@ -265,209 +326,334 @@ export default function ConfiguracoesPage() {
                 <TextInput label="E-mail" value={user?.email || ""} disabled />
                 <TextInput label="Papel" value={roleLabel} disabled />
                 <TextInput label="Empresa" value={tenant?.name || ""} disabled />
-                <NumberInput
-                  label="Custo médio do lead (R$)"
-                  description="Usado no dashboard e nas metas"
-                  decimalScale={2}
-                  fixedDecimalScale
-                  min={0}
-                  value={avgLeadCost}
-                  onChange={setAvgLeadCost}
-                />
+                {isAdmin ? (
+                  <NumberInput
+                    label="Custo médio do lead (R$)"
+                    description="Usado no dashboard e nas metas"
+                    decimalScale={2}
+                    fixedDecimalScale
+                    min={0}
+                    value={avgLeadCost}
+                    onChange={setAvgLeadCost}
+                  />
+                ) : null}
               </SimpleGrid>
 
-              <Stack gap="sm" mt="xl">
-                <Title order={4}>Exportação LGPD</Title>
-                <Text size="sm" c={colors.textSecondary}>
-                  Baixe um CSV com os leads do tenant. Soft-delete individual está disponível na
-                  página do lead.
-                </Text>
-                <Button
-                  leftSection={<Download size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                  loading={exporting}
-                  onClick={() => void exportCsv()}
-                  w="fit-content"
-                  variant="light"
-                >
-                  Exportar CSV
-                </Button>
-              </Stack>
-            </form>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="colaboradores">
-            <Stack gap="lg">
-              <form onSubmit={invite}>
-                <Title order={4} mb={4}>
-                  Convidar colaborador
-                </Title>
-                <Text size="sm" c={colors.textSecondary} mb="md">
-                  Envie um link por e-mail para o colaborador definir a senha.
-                </Text>
-                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-                  <TextInput
-                    label="E-mail"
-                    type="email"
-                    required
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.currentTarget.value)}
-                  />
-                  <Select
-                    label="Papel"
-                    data={[
-                      { value: "operador", label: "Operador" },
-                      { value: "admin", label: "Admin" },
-                    ]}
-                    value={inviteRole}
-                    onChange={(value) =>
-                      setInviteRole((value as "admin" | "operador") || "operador")
-                    }
-                    allowDeselect={false}
-                  />
-                  <Group align="flex-end">
-                    <Button type="submit" loading={inviting}>
-                      Enviar convite
-                    </Button>
-                  </Group>
-                </SimpleGrid>
-              </form>
-
-              <div>
-                <Title order={4} mb="md">
-                  Equipe
-                </Title>
-                {loadingCollabs ? (
-                  <Text size="sm" c={colors.textMuted}>
-                    Carregando...
+              {isAdmin ? (
+                <Stack gap="sm" mt="xl">
+                  <Title order={4}>Exportação LGPD</Title>
+                  <Text size="sm" c={colors.textSecondary}>
+                    Baixe um CSV com os leads do tenant. Soft-delete individual está disponível na
+                    página do lead.
                   </Text>
-                ) : (
-                  <Table.ScrollContainer minWidth={560}>
-                    <Table verticalSpacing="sm" highlightOnHover>
-                      <Table.Thead style={{ background: colors.background }}>
-                        <Table.Tr>
-                          <Table.Th>Nome</Table.Th>
-                          <Table.Th>E-mail</Table.Th>
-                          <Table.Th>Papel</Table.Th>
-                          <Table.Th>Status</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {users.map((u) => (
-                          <Table.Tr key={u.id}>
-                            <Table.Td>
-                              <Text size="sm" fw={600}>
-                                {u.name}
-                              </Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="sm">{u.email}</Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge variant="light" color="gray">
-                                {u.role === "admin" ? "Admin" : "Operador"}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge variant="light" color="green">
-                                Ativo
-                              </Badge>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                        {invites.map((i) => (
-                          <Table.Tr key={i.id}>
-                            <Table.Td>
-                              <Text size="sm" c={colors.textMuted}>
-                                —
-                              </Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="sm">{i.email}</Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge variant="light" color="gray">
-                                {i.role === "admin" ? "Admin" : "Operador"}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>
-                              <Badge variant="light" color="orbix">
-                                Convite pendente
-                              </Badge>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </Table.ScrollContainer>
-                )}
-              </div>
-            </Stack>
+                  <Button
+                    leftSection={<Download size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                    loading={exporting}
+                    onClick={() => void exportCsv()}
+                    w="fit-content"
+                    variant="light"
+                  >
+                    Exportar CSV
+                  </Button>
+                </Stack>
+              ) : null}
+            </form>
+
+            <DividerPasswordSection
+              currentPassword={currentPassword}
+              newPassword={newPassword}
+              confirmPassword={confirmPassword}
+              savingPassword={savingPassword}
+              setCurrentPassword={setCurrentPassword}
+              setNewPassword={setNewPassword}
+              setConfirmPassword={setConfirmPassword}
+              onSubmit={savePassword}
+            />
           </Tabs.Panel>
 
-          <Tabs.Panel value="notificacoes">
-            <form onSubmit={(e) => void saveNotifications(e)}>
-              <Title order={4} mb={4}>
-                Notificações por e-mail
-              </Title>
-              <Text size="sm" c={colors.textSecondary} mb="lg">
-                Controle quais eventos deseja receber.
-              </Text>
-              <Stack gap={0}>
-                <Group
-                  justify="space-between"
-                  py="md"
-                  style={{ borderBottom: `1px solid ${colors.borderLight}` }}
-                >
-                  <div>
-                    <Text size="sm" fw={600}>
-                      Convite de colaborador
+          {isAdmin ? (
+            <Tabs.Panel value="colaboradores">
+              <Stack gap="lg">
+                <form onSubmit={invite}>
+                  <Title order={4} mb={4}>
+                    Convidar colaborador
+                  </Title>
+                  <Text size="sm" c={colors.textSecondary} mb="md">
+                    Envie um link por e-mail para o colaborador definir a senha.
+                  </Text>
+                  <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+                    <TextInput
+                      label="E-mail"
+                      type="email"
+                      required
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.currentTarget.value)}
+                    />
+                    <Select
+                      label="Papel"
+                      data={[
+                        { value: "operador", label: "Operador" },
+                        { value: "admin", label: "Admin" },
+                      ]}
+                      value={inviteRole}
+                      onChange={(value) =>
+                        setInviteRole((value as "admin" | "operador") || "operador")
+                      }
+                      allowDeselect={false}
+                    />
+                    <Group align="flex-end">
+                      <Button type="submit" loading={inviting}>
+                        Enviar convite
+                      </Button>
+                    </Group>
+                  </SimpleGrid>
+                </form>
+
+                <div>
+                  <Title order={4} mb="md">
+                    Equipe
+                  </Title>
+                  {loadingCollabs ? (
+                    <Text size="sm" c={colors.textMuted}>
+                      Carregando...
                     </Text>
-                    <Text size="xs" c={colors.textMuted}>
-                      Quando um convite for aceito
-                    </Text>
-                  </div>
-                  <Switch
-                    checked={emailNotifyInvite}
-                    onChange={(e) => setEmailNotifyInvite(e.currentTarget.checked)}
-                  />
-                </Group>
-                <Group
-                  justify="space-between"
-                  py="md"
-                  style={{ borderBottom: `1px solid ${colors.borderLight}` }}
-                >
-                  <div>
-                    <Text size="sm" fw={600}>
-                      Captura concluída
-                    </Text>
-                    <Text size="xs" c={colors.textMuted}>
-                      Ao finalizar uma busca de leads
-                    </Text>
-                  </div>
-                  <Switch
-                    checked={emailNotifyCapture}
-                    onChange={(e) => setEmailNotifyCapture(e.currentTarget.checked)}
-                  />
-                </Group>
-                <Group justify="space-between" py="md">
-                  <div>
-                    <Text size="sm" fw={600}>
-                      Alertas de créditos
-                    </Text>
-                    <Text size="xs" c={colors.textMuted}>
-                      Quando o saldo estiver baixo ou esgotado
-                    </Text>
-                  </div>
-                  <Switch
-                    checked={emailNotifyCredits}
-                    onChange={(e) => setEmailNotifyCredits(e.currentTarget.checked)}
-                  />
-                </Group>
+                  ) : (
+                    <Table.ScrollContainer minWidth={560}>
+                      <Table verticalSpacing="sm" highlightOnHover>
+                        <Table.Thead style={{ background: colors.background }}>
+                          <Table.Tr>
+                            <Table.Th>Nome</Table.Th>
+                            <Table.Th>E-mail</Table.Th>
+                            <Table.Th>Papel</Table.Th>
+                            <Table.Th>Captura</Table.Th>
+                            <Table.Th>Status</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {users.map((u) => (
+                            <Table.Tr key={u.id}>
+                              <Table.Td>
+                                <Text size="sm" fw={600}>
+                                  {u.name}
+                                </Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Text size="sm">{u.email}</Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Badge variant="light" color="gray">
+                                  {u.role === "admin" ? "Admin" : "Operador"}
+                                </Badge>
+                              </Table.Td>
+                              <Table.Td>
+                                {u.role === "operador" ? (
+                                  <Switch
+                                    size="sm"
+                                    checked={u.canCapture !== false}
+                                    onChange={() => {
+                                      const next = !(u.canCapture !== false);
+                                      void (async () => {
+                                        try {
+                                          await api(`/api/v1/collaborators/${u.id}`, {
+                                            method: "PATCH",
+                                            body: { canCapture: next },
+                                          });
+                                          setUsers((prev) =>
+                                            prev.map((row) =>
+                                              row.id === u.id ? { ...row, canCapture: next } : row
+                                            )
+                                          );
+                                          notifications.show({
+                                            color: "green",
+                                            title: "Permissão atualizada",
+                                            message: next
+                                              ? "Operador pode capturar leads."
+                                              : "Captura desabilitada para o operador.",
+                                          });
+                                        } catch (err) {
+                                          notifications.show({
+                                            color: "red",
+                                            title: "Erro",
+                                            message:
+                                              err instanceof ApiError
+                                                ? err.message
+                                                : "Falha ao atualizar permissão.",
+                                          });
+                                        }
+                                      })();
+                                    }}
+                                    label={u.canCapture !== false ? "Permitido" : "Bloqueado"}
+                                  />
+                                ) : (
+                                  <Text size="sm" c={colors.textMuted}>
+                                    —
+                                  </Text>
+                                )}
+                              </Table.Td>
+                              <Table.Td>
+                                <Badge variant="light" color="green">
+                                  Ativo
+                                </Badge>
+                              </Table.Td>
+                            </Table.Tr>
+                          ))}
+                          {invites.map((i) => (
+                            <Table.Tr key={i.id}>
+                              <Table.Td>
+                                <Text size="sm" c={colors.textMuted}>
+                                  —
+                                </Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Text size="sm">{i.email}</Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Badge variant="light" color="gray">
+                                  {i.role === "admin" ? "Admin" : "Operador"}
+                                </Badge>
+                              </Table.Td>
+                              <Table.Td>
+                                <Text size="sm" c={colors.textMuted}>
+                                  —
+                                </Text>
+                              </Table.Td>
+                              <Table.Td>
+                                <Badge variant="light" color="orbix">
+                                  Convite pendente
+                                </Badge>
+                              </Table.Td>
+                            </Table.Tr>
+                          ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Table.ScrollContainer>
+                  )}
+                </div>
               </Stack>
-            </form>
-          </Tabs.Panel>
+            </Tabs.Panel>
+          ) : null}
+
+          {isAdmin ? (
+            <Tabs.Panel value="notificacoes">
+              <form onSubmit={(e) => void saveNotifications(e)}>
+                <Title order={4} mb={4}>
+                  Notificações por e-mail
+                </Title>
+                <Text size="sm" c={colors.textSecondary} mb="lg">
+                  Controle quais eventos deseja receber.
+                </Text>
+                <Stack gap={0}>
+                  <Group
+                    justify="space-between"
+                    py="md"
+                    style={{ borderBottom: `1px solid ${colors.borderLight}` }}
+                  >
+                    <div>
+                      <Text size="sm" fw={600}>
+                        Convite de colaborador
+                      </Text>
+                      <Text size="xs" c={colors.textMuted}>
+                        Quando um convite for aceito
+                      </Text>
+                    </div>
+                    <Switch
+                      checked={emailNotifyInvite}
+                      onChange={() => setEmailNotifyInvite((v) => !v)}
+                    />
+                  </Group>
+                  <Group
+                    justify="space-between"
+                    py="md"
+                    style={{ borderBottom: `1px solid ${colors.borderLight}` }}
+                  >
+                    <div>
+                      <Text size="sm" fw={600}>
+                        Captura concluída
+                      </Text>
+                      <Text size="xs" c={colors.textMuted}>
+                        Ao finalizar uma busca de leads
+                      </Text>
+                    </div>
+                    <Switch
+                      checked={emailNotifyCapture}
+                      onChange={() => setEmailNotifyCapture((v) => !v)}
+                    />
+                  </Group>
+                  <Group justify="space-between" py="md">
+                    <div>
+                      <Text size="sm" fw={600}>
+                        Alertas de créditos
+                      </Text>
+                      <Text size="xs" c={colors.textMuted}>
+                        Quando o saldo estiver baixo ou esgotado
+                      </Text>
+                    </div>
+                    <Switch
+                      checked={emailNotifyCredits}
+                      onChange={() => setEmailNotifyCredits((v) => !v)}
+                    />
+                  </Group>
+                </Stack>
+              </form>
+            </Tabs.Panel>
+          ) : null}
         </Tabs>
       </Card>
     </>
+  );
+}
+
+function DividerPasswordSection({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+  savingPassword,
+  setCurrentPassword,
+  setNewPassword,
+  setConfirmPassword,
+  onSubmit,
+}: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+  savingPassword: boolean;
+  setCurrentPassword: (v: string) => void;
+  setNewPassword: (v: string) => void;
+  setConfirmPassword: (v: string) => void;
+  onSubmit: (e?: FormEvent) => void | Promise<void>;
+}) {
+  return (
+    <form onSubmit={(e) => void onSubmit(e)}>
+      <Stack gap="sm" mt="xl" pt="xl" style={{ borderTop: `1px solid ${colors.borderLight}` }}>
+        <Title order={4}>Alterar senha</Title>
+        <Text size="sm" c={colors.textSecondary}>
+          Informe a senha atual e escolha uma nova com no mínimo 8 caracteres.
+        </Text>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <PasswordInput
+            label="Senha atual"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+            required
+          />
+          <div />
+          <PasswordInput
+            label="Nova senha"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.currentTarget.value)}
+            required
+          />
+          <PasswordInput
+            label="Confirmar nova senha"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+            required
+          />
+        </SimpleGrid>
+        <Button type="submit" loading={savingPassword} w="fit-content" mt="sm">
+          Atualizar senha
+        </Button>
+      </Stack>
+    </form>
   );
 }
