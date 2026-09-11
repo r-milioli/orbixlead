@@ -172,8 +172,13 @@ function LogoMark({ collapsed }: { collapsed: boolean }) {
         />
       </Box>
       {!collapsed ? (
-        <Text fw={700} size="lg" c={colors.primary} style={{ letterSpacing: "-0.02em" }}>
-          Orbixlead
+        <Text fw={700} size="lg" style={{ letterSpacing: "-0.02em" }}>
+          <Text span c={colors.primary} inherit>
+            Orbix
+          </Text>
+          <Text span c={colors.textPrimary} inherit>
+            lead
+          </Text>
         </Text>
       ) : null}
     </Group>
@@ -253,7 +258,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [collapsed, { toggle: toggleCollapsed }] = useDisclosure(false);
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] = useDisclosure(false);
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useMediaQuery("(max-width: 768px)", false, {
+    getInitialValueInEffect: true,
+  });
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
 

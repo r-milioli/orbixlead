@@ -78,8 +78,13 @@ export default function LoginPage() {
           <div>
             <Group gap={10} mb={8}>
               <Image src="/logo.png" alt="Orbixlead" width={44} height={44} priority />
-              <Title order={2} c={colors.primary} style={{ letterSpacing: "-0.02em" }}>
-                Orbixlead
+              <Title order={2} style={{ letterSpacing: "-0.02em" }}>
+                <Text span c={colors.primary} inherit>
+                  Orbix
+                </Text>
+                <Text span c={colors.textPrimary} inherit>
+                  lead
+                </Text>
               </Title>
             </Group>
             <Text size="sm" c={colors.textSecondary}>

@@ -30,12 +30,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={inter.variable}>
+    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
       <head>
         <ColorSchemeScript defaultColorScheme="light" />
       </head>
-      <body style={{ fontFamily: "Inter, system-ui, sans-serif", background: colors.background }}>
-        <MantineProvider theme={theme} defaultColorScheme="light">
+      <body
+        style={{ fontFamily: "Inter, system-ui, sans-serif", background: colors.background }}
+        suppressHydrationWarning
+      >
+        <MantineProvider theme={theme} defaultColorScheme="light" forceColorScheme="light">
           <DatesProvider settings={{ locale: "pt-br", firstDayOfWeek: 0 }}>
             <Notifications position="top-right" zIndex={4000} />
             <AuthProvider>{children}</AuthProvider>
