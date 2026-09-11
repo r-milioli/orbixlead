@@ -17,12 +17,13 @@ import {
   Text,
   Title,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { LayoutDashboard, Plus, RefreshCw, Target, TrendingDown, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
-import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 const COMPANY_VIEW = "__company__";
 
@@ -129,30 +130,43 @@ function KpiCard({
   value,
   delta,
   positive = true,
+  compact = false,
 }: {
   label: string;
   value: string;
   delta?: string;
   positive?: boolean;
+  compact?: boolean;
 }) {
   const Trend = positive ? TrendingUp : TrendingDown;
   return (
-    <Card padding={16}>
-      <Text size="sm" c={colors.textMuted} style={{ fontWeight: 400, fontSize: 13 }}>
+    <Card padding={compact ? 12 : 16} style={{ minWidth: 0 }}>
+      <Text
+        size="sm"
+        c={colors.textMuted}
+        lineClamp={2}
+        style={{ fontWeight: 400, fontSize: compact ? 12 : 13 }}
+      >
         {label}
       </Text>
       <Text
         mt={8}
         mb={delta ? 8 : 0}
         c={colors.textPrimary}
-        style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.15 }}
+        style={{
+          fontSize: compact ? 22 : 28,
+          fontWeight: 700,
+          letterSpacing: "-0.03em",
+          lineHeight: 1.15,
+          wordBreak: "break-word",
+        }}
       >
         {value}
       </Text>
       {delta ? (
-        <Group gap={5} c={positive ? colors.success : colors.danger}>
-          <Trend size={14} strokeWidth={ICON_STROKE} />
-          <Text size="xs" style={{ fontWeight: 500, fontSize: 12 }}>
+        <Group gap={5} c={positive ? colors.success : colors.danger} wrap="nowrap">
+          <Trend size={14} strokeWidth={ICON_STROKE} style={{ flexShrink: 0 }} />
+          <Text size="xs" lineClamp={2} style={{ fontWeight: 500, fontSize: 12 }}>
             {delta}
           </Text>
         </Group>
@@ -163,7 +177,7 @@ function KpiCard({
 
 function SectionHead({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <Box mb={18}>
+    <Box mb={{ base: 12, sm: 18 }}>
       <Title order={3} style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
         {title}
       </Title>
@@ -181,37 +195,47 @@ function StatChip({
   value,
   hint,
   accent,
+  compact = false,
 }: {
   label: string;
   value: string;
   hint?: string;
   accent?: string;
+  compact?: boolean;
 }) {
   return (
     <Box
       style={{
         background: colors.surfaceSecondary,
         borderRadius: 10,
-        padding: "12px 14px",
-        minHeight: 78,
+        padding: compact ? "10px 10px" : "12px 14px",
+        minHeight: compact ? 72 : 78,
+        minWidth: 0,
       }}
     >
-      <Text size="xs" c={colors.textMuted} mb={4} style={{ fontSize: 11, letterSpacing: "0.02em" }}>
+      <Text
+        size="xs"
+        c={colors.textMuted}
+        mb={4}
+        lineClamp={2}
+        style={{ fontSize: 11, letterSpacing: "0.02em" }}
+      >
         {label}
       </Text>
       <Text
         fw={700}
         style={{
-          fontSize: 16,
+          fontSize: compact ? 13 : 16,
           letterSpacing: "-0.02em",
           color: accent ?? colors.textPrimary,
-          lineHeight: 1.2,
+          lineHeight: 1.25,
+          wordBreak: "break-word",
         }}
       >
         {value}
       </Text>
       {hint ? (
-        <Text size="xs" c={colors.textMuted} mt={4} style={{ fontSize: 11 }}>
+        <Text size="xs" c={colors.textMuted} mt={4} lineClamp={2} style={{ fontSize: 11 }}>
           {hint}
         </Text>
       ) : null}
@@ -219,33 +243,52 @@ function StatChip({
   );
 }
 
-function GoalDetailCard({ goal }: { goal: GoalProgressItem }) {
+function GoalDetailCard({
+  goal,
+  compact = false,
+}: {
+  goal: GoalProgressItem;
+  compact?: boolean;
+}) {
   const hasTarget = goal.target > 0;
   const remaining = goal.remaining ?? Math.max(0, goal.target - goal.current);
   const pct = hasTarget ? Math.round(goal.progress * 100) : 0;
   const done = hasTarget && remaining === 0;
   const predicted = goal.predicted;
   const realized = goal.realized;
+  const ringSize = compact ? 72 : 92;
 
   return (
     <Box
       style={{
         border: `1px solid ${colors.borderLight}`,
         borderRadius: 12,
-        padding: 16,
+        padding: compact ? 12 : 16,
         background: `linear-gradient(165deg, ${colors.primaryLight} 0%, ${colors.surface} 42%)`,
+        minWidth: 0,
       }}
     >
-      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md" mb={14}>
-        <Box style={{ minWidth: 0, flex: 1 }}>
-          <Group gap={8} mb={4}>
-            <Target size={16} strokeWidth={ICON_STROKE} color={colors.primary} />
-            <Text size="sm" fw={700} lineClamp={1} style={{ letterSpacing: "-0.01em" }}>
+      <Group
+        justify="space-between"
+        align={compact ? "center" : "flex-start"}
+        wrap="wrap"
+        gap="md"
+        mb={14}
+      >
+        <Box style={{ minWidth: 0, flex: "1 1 160px" }}>
+          <Group gap={8} mb={4} wrap="nowrap">
+            <Target
+              size={16}
+              strokeWidth={ICON_STROKE}
+              color={colors.primary}
+              style={{ flexShrink: 0 }}
+            />
+            <Text size="sm" fw={700} lineClamp={2} style={{ letterSpacing: "-0.01em" }}>
               {goal.name}
             </Text>
           </Group>
           {goal.scope === "operator" && goal.assignee?.name ? (
-            <Text size="xs" c={colors.textMuted}>
+            <Text size="xs" c={colors.textMuted} lineClamp={1}>
               Responsável: {goal.assignee.name}
             </Text>
           ) : (
@@ -253,9 +296,16 @@ function GoalDetailCard({ goal }: { goal: GoalProgressItem }) {
               Meta mensal da empresa
             </Text>
           )}
-          <Text mt={10} style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em" }}>
+          <Text
+            mt={10}
+            style={{
+              fontSize: compact ? 22 : 28,
+              fontWeight: 700,
+              letterSpacing: "-0.03em",
+            }}
+          >
             {goal.current}
-            <Text span c={colors.textMuted} style={{ fontSize: 16, fontWeight: 500 }}>
+            <Text span c={colors.textMuted} style={{ fontSize: compact ? 14 : 16, fontWeight: 500 }}>
               {" "}
               / {hasTarget ? goal.target : "—"}
             </Text>
@@ -271,15 +321,16 @@ function GoalDetailCard({ goal }: { goal: GoalProgressItem }) {
 
         {hasTarget ? (
           <RingProgress
-            size={92}
-            thickness={8}
+            size={ringSize}
+            thickness={compact ? 7 : 8}
             roundCaps
             sections={[{ value: Math.min(100, pct), color: done ? "teal" : "orbix" }]}
             label={
-              <Text ta="center" fw={700} style={{ fontSize: 16 }}>
+              <Text ta="center" fw={700} style={{ fontSize: compact ? 14 : 16 }}>
                 {pct}%
               </Text>
             }
+            style={{ flexShrink: 0, marginInline: compact ? "auto" : undefined }}
           />
         ) : null}
       </Group>
@@ -294,19 +345,22 @@ function GoalDetailCard({ goal }: { goal: GoalProgressItem }) {
         />
       ) : null}
 
-      <SimpleGrid cols={{ base: 2, sm: 3 }} spacing={8}>
+      <SimpleGrid cols={{ base: 2, sm: 3 }} spacing={compact ? 6 : 8}>
         <StatChip
+          compact={compact}
           label="Falta atingir"
           value={hasTarget ? String(remaining) : "—"}
           hint={done ? "Concluído" : "conversões"}
           accent={done ? colors.success : colors.warning}
         />
         <StatChip
+          compact={compact}
           label="Faturamento previsto"
           value={formatMoney(predicted?.faturamento)}
           hint="ao bater a meta"
         />
         <StatChip
+          compact={compact}
           label="Lucro previsto"
           value={formatMoney(predicted?.lucro)}
           hint={
@@ -317,16 +371,19 @@ function GoalDetailCard({ goal }: { goal: GoalProgressItem }) {
           accent={colors.success}
         />
         <StatChip
+          compact={compact}
           label="Já realizado"
           value={formatMoney(realized?.faturamento)}
           hint={`${goal.current} conversões`}
         />
         <StatChip
+          compact={compact}
           label="Lucro realizado"
           value={formatMoney(realized?.lucro)}
           hint="no período"
         />
         <StatChip
+          compact={compact}
           label="Potencial restante"
           value={formatMoney(goal.remainingRevenue ?? 0)}
           hint={remaining > 0 ? `${remaining} × preço de venda` : "meta completa"}
@@ -340,23 +397,33 @@ function GoalDetailCard({ goal }: { goal: GoalProgressItem }) {
 function GoalProgressFallback({
   current,
   periodLabel,
+  compact = false,
 }: {
   current: number;
   periodLabel: string;
+  compact?: boolean;
 }) {
   return (
     <Box
       style={{
         border: `1px solid ${colors.borderLight}`,
         borderRadius: 12,
-        padding: 16,
+        padding: compact ? 12 : 16,
         background: colors.surfaceSecondary,
+        minWidth: 0,
       }}
     >
-      <Text size="sm" fw={700}>
+      <Text size="sm" fw={700} lineClamp={2}>
         Resultado da empresa · {periodLabel}
       </Text>
-      <Text mt={8} style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em" }}>
+      <Text
+        mt={8}
+        style={{
+          fontSize: compact ? 22 : 28,
+          fontWeight: 700,
+          letterSpacing: "-0.03em",
+        }}
+      >
         {current.toLocaleString("pt-BR")}
       </Text>
       <Text size="xs" c={colors.textMuted} mt={4}>
@@ -369,6 +436,9 @@ function GoalProgressFallback({
 
 export default function DashboardPage() {
   const { user, isAdmin, isOperador } = useAuth();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [data, setData] = useState<MetricsResponse["metrics"] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -378,6 +448,8 @@ export default function DashboardPage() {
 
   const canCapture = isAdmin || user?.canCapture !== false;
   const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const chartHeight = isMobile ? 180 : 220;
+  const cardPad = isMobile ? 12 : 16;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -454,6 +526,7 @@ export default function DashboardPage() {
           <>
             <Button
               variant="default"
+              size={isMobile ? "sm" : "md"}
               leftSection={<RefreshCw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
               loading={loading}
               onClick={() => setRefreshKey((k) => k + 1)}
@@ -462,6 +535,7 @@ export default function DashboardPage() {
             </Button>
             {canCapture ? (
               <Button
+                size={isMobile ? "sm" : "md"}
                 leftSection={<Plus size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
                 component={Link}
                 href="/captura"
@@ -473,7 +547,7 @@ export default function DashboardPage() {
         }
       />
 
-      <Box mb="md" maw={720}>
+      <Box mb="md" maw={isMobile ? undefined : 720} w="100%">
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={12} style={{ alignItems: "end" }}>
           <Select
             label="Período"
@@ -485,6 +559,7 @@ export default function DashboardPage() {
               setSelectedGoalId(null);
             }}
             allowDeselect={false}
+            size={isMobile ? "sm" : "md"}
           />
           <Select
             label="Métricas em visualização"
@@ -495,6 +570,8 @@ export default function DashboardPage() {
             }}
             allowDeselect={false}
             searchable={availableGoals.length > 4}
+            size={isMobile ? "sm" : "md"}
+            comboboxProps={{ width: isMobile ? "target" : undefined }}
           />
         </SimpleGrid>
         <Text size="xs" c={colors.textMuted} mt={8}>
@@ -505,27 +582,28 @@ export default function DashboardPage() {
       </Box>
 
       {loading && !data ? (
-        <Stack gap={16}>
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
+        <Stack gap={isMobile ? 12 : 16}>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={isMobile ? 12 : 16}>
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} height={118} radius="md" />
+              <Skeleton key={i} height={isMobile ? 100 : 118} radius="md" />
             ))}
           </SimpleGrid>
-          <SimpleGrid cols={{ base: 1, md: 2 }}>
-            <Skeleton height={280} radius="md" />
-            <Skeleton height={280} radius="md" />
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing={isMobile ? 12 : 16}>
+            <Skeleton height={isMobile ? 220 : 280} radius="md" />
+            <Skeleton height={isMobile ? 220 : 280} radius="md" />
           </SimpleGrid>
         </Stack>
       ) : error ? (
         <EmptyState title="Dashboard indisponível" description={error} icon={LayoutDashboard} />
       ) : (
-        <Stack gap={16}>
+        <Stack gap={isMobile ? 12 : 16}>
           <Text size="xs" c={colors.textMuted}>
             {scopeLabel} · {periodLabel} · conversões pelo fechamento oficial
           </Text>
 
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={16}>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={isMobile ? 12 : 16}>
             <KpiCard
+              compact={!!isMobile}
               label="Taxa de conversão"
               value={`${((kpis?.conversionRate ?? 0) * 100).toLocaleString("pt-BR", {
                 maximumFractionDigits: 1,
@@ -534,6 +612,7 @@ export default function DashboardPage() {
               positive
             />
             <KpiCard
+              compact={!!isMobile}
               label="Custo por conversão"
               value={formatMoney(kpis?.costPerConversion)}
               delta={
@@ -544,6 +623,7 @@ export default function DashboardPage() {
               positive={false}
             />
             <KpiCard
+              compact={!!isMobile}
               label={isCurrentMonth ? "Leads no CRM — 7 dias" : "Leads no CRM — mês"}
               value={(
                 isCurrentMonth ? (kpis?.leadsLast7Days ?? 0) : (data?.period.importedLeads ?? 0)
@@ -551,6 +631,7 @@ export default function DashboardPage() {
               delta="enviados ao CRM"
             />
             <KpiCard
+              compact={!!isMobile}
               label={isCurrentMonth ? "Convertidos — 7 dias" : "Convertidos — mês"}
               value={(
                 isCurrentMonth
@@ -561,8 +642,8 @@ export default function DashboardPage() {
             />
           </SimpleGrid>
 
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing={16}>
-            <Card padding={16}>
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing={isMobile ? 12 : 16}>
+            <Card padding={cardPad} style={{ minWidth: 0, overflow: "hidden" }}>
               <SectionHead title="Funil de conversão" subtitle="Snapshot atual do pipeline" />
               {funnel.length === 0 ? (
                 <EmptyState
@@ -570,9 +651,46 @@ export default function DashboardPage() {
                   description="Mova leads no CRM para popular o funil."
                 />
               ) : (
-                <Stack gap={10}>
+                <Stack gap={isMobile ? 12 : 10}>
                   {funnel.map((item) => {
                     const widthPct = Math.max(8, (item.count / maxFunnel) * 100);
+                    if (isMobile) {
+                      return (
+                        <Box key={item.slug} style={{ minWidth: 0 }}>
+                          <Group justify="space-between" gap={8} mb={6} wrap="nowrap">
+                            <Text
+                              size="xs"
+                              c={colors.textSecondary}
+                              lineClamp={1}
+                              style={{ fontWeight: 500, minWidth: 0 }}
+                            >
+                              {item.label}
+                            </Text>
+                            <Text fw={700} size="xs" style={{ flexShrink: 0 }}>
+                              {item.count}
+                            </Text>
+                          </Group>
+                          <Box
+                            style={{
+                              height: 22,
+                              background: colors.primaryLight,
+                              borderRadius: 4,
+                              overflow: "hidden",
+                            }}
+                          >
+                            <Box
+                              style={{
+                                width: `${widthPct}%`,
+                                height: "100%",
+                                background: colors.primary,
+                                opacity: 0.85,
+                                borderRadius: 4,
+                              }}
+                            />
+                          </Box>
+                        </Box>
+                      );
+                    }
                     return (
                       <Box
                         key={item.slug}
@@ -582,6 +700,7 @@ export default function DashboardPage() {
                           gap: 10,
                           alignItems: "center",
                           fontSize: 12,
+                          minWidth: 0,
                         }}
                       >
                         <Text size="xs" c={colors.textSecondary} style={{ fontWeight: 500 }}>
@@ -615,7 +734,7 @@ export default function DashboardPage() {
               )}
             </Card>
 
-            <Card padding={16}>
+            <Card padding={cardPad} style={{ minWidth: 0, overflow: "hidden" }}>
               <SectionHead
                 title={`Prospecção — ${periodLabel}`}
                 subtitle="Leads no CRM vs. convertidos (fechamento)"
@@ -626,29 +745,51 @@ export default function DashboardPage() {
                   description="Envie leads da captura para o CRM para ver a evolução."
                 />
               ) : (
-                <BarChart
-                  h={220}
-                  data={chartData}
-                  dataKey="day"
-                  series={[
-                    { name: "Importados", color: "orbix.5" },
-                    { name: "Convertidos", color: "orbix.2" },
-                  ]}
-                  tickLine="none"
-                  gridAxis="none"
-                  withLegend={false}
-                  barProps={{ radius: 4 }}
-                />
+                <Box style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                  <Box style={{ minWidth: isMobile ? 280 : undefined }}>
+                    <BarChart
+                      h={chartHeight}
+                      data={chartData}
+                      dataKey="day"
+                      series={[
+                        { name: "Importados", color: "orbix.5" },
+                        { name: "Convertidos", color: "orbix.2" },
+                      ]}
+                      tickLine="none"
+                      gridAxis="none"
+                      withLegend={false}
+                      barProps={{ radius: 4 }}
+                      xAxisProps={
+                        isMobile
+                          ? {
+                              interval: "preserveStartEnd",
+                              angle: -30,
+                              textAnchor: "end",
+                              height: 48,
+                              tick: { fontSize: 10 },
+                            }
+                          : undefined
+                      }
+                    />
+                  </Box>
+                </Box>
               )}
             </Card>
           </SimpleGrid>
 
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={16}>
-            <Card padding={16}>
-              <Text size="sm" c={colors.textMuted} style={{ fontSize: 13 }}>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={isMobile ? 12 : 16}>
+            <Card padding={cardPad} style={{ minWidth: 0 }}>
+              <Text size="sm" c={colors.textMuted} style={{ fontSize: isMobile ? 12 : 13 }}>
                 {isCurrentMonth ? "Buscas hoje" : "Buscas no mês"}
               </Text>
-              <Text mt={8} style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em" }}>
+              <Text
+                mt={8}
+                style={{
+                  fontSize: isMobile ? 22 : 28,
+                  fontWeight: 700,
+                  letterSpacing: "-0.03em",
+                }}
+              >
                 {(
                   isCurrentMonth ? (kpis?.capturesToday ?? 0) : (kpis?.capturesMonth ?? 0)
                 ).toLocaleString("pt-BR")}
@@ -660,11 +801,18 @@ export default function DashboardPage() {
                 leads novos na captura
               </Text>
             </Card>
-            <Card padding={16}>
-              <Text size="sm" c={colors.textMuted} style={{ fontSize: 13 }}>
+            <Card padding={cardPad} style={{ minWidth: 0 }}>
+              <Text size="sm" c={colors.textMuted} style={{ fontSize: isMobile ? 12 : 13 }}>
                 {isCurrentMonth ? "Importados hoje" : "Importados no mês"}
               </Text>
-              <Text mt={8} style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em" }}>
+              <Text
+                mt={8}
+                style={{
+                  fontSize: isMobile ? 22 : 28,
+                  fontWeight: 700,
+                  letterSpacing: "-0.03em",
+                }}
+              >
                 {(
                   isCurrentMonth
                     ? (kpis?.importedToday ?? 0)
@@ -677,11 +825,18 @@ export default function DashboardPage() {
                   : "Enviados da captura para o CRM"}
               </Text>
             </Card>
-            <Card padding={16}>
-              <Text size="sm" c={colors.textMuted} style={{ fontSize: 13 }}>
+            <Card padding={cardPad} style={{ minWidth: 0 }}>
+              <Text size="sm" c={colors.textMuted} style={{ fontSize: isMobile ? 12 : 13 }}>
                 {isCurrentMonth ? "Convertidos hoje" : "Convertidos no mês"}
               </Text>
-              <Text mt={8} style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em" }}>
+              <Text
+                mt={8}
+                style={{
+                  fontSize: isMobile ? 22 : 28,
+                  fontWeight: 700,
+                  letterSpacing: "-0.03em",
+                }}
+              >
                 {(
                   isCurrentMonth
                     ? (kpis?.convertedToday ?? 0)
@@ -692,11 +847,19 @@ export default function DashboardPage() {
                 Fechamento oficial no CRM
               </Text>
             </Card>
-            <Card padding={16}>
-              <Text size="sm" c={colors.textMuted} style={{ fontSize: 13 }}>
+            <Card padding={cardPad} style={{ minWidth: 0 }}>
+              <Text size="sm" c={colors.textMuted} style={{ fontSize: isMobile ? 12 : 13 }}>
                 Meta selecionada
               </Text>
-              <Text mt={8} mb={8} style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.03em" }}>
+              <Text
+                mt={8}
+                mb={8}
+                style={{
+                  fontSize: isMobile ? 20 : 24,
+                  fontWeight: 700,
+                  letterSpacing: "-0.03em",
+                }}
+              >
                 {goal
                   ? `${goal.current} / ${goal.target}`
                   : `${data?.period.conversions ?? 0} / —`}
@@ -718,7 +881,7 @@ export default function DashboardPage() {
                   }}
                 />
               </Box>
-              <Text size="xs" c={colors.textMuted} mt={7} style={{ fontSize: 12 }}>
+              <Text size="xs" c={colors.textMuted} mt={7} lineClamp={2} style={{ fontSize: 12 }}>
                 {goal
                   ? `${Math.round(goal.progress * 100)}% · ${goalSelectLabel(goal)}`
                   : "Nenhuma meta da empresa neste período"}
@@ -726,8 +889,8 @@ export default function DashboardPage() {
             </Card>
           </SimpleGrid>
 
-          <SimpleGrid cols={{ base: 1, md: isAdmin ? 2 : 1 }} spacing={16}>
-            <Card padding={16}>
+          <SimpleGrid cols={{ base: 1, md: isAdmin ? 2 : 1 }} spacing={isMobile ? 12 : 16}>
+            <Card padding={cardPad} style={{ minWidth: 0 }}>
               <SectionHead
                 title="Metas da empresa"
                 subtitle={`Progresso, quanto falta e resultado previsto (${periodLabel})`}
@@ -736,18 +899,19 @@ export default function DashboardPage() {
                 <GoalProgressFallback
                   current={data?.period.conversions ?? 0}
                   periodLabel={periodLabel}
+                  compact={!!isMobile}
                 />
               ) : (
                 <Stack gap={14}>
                   {companyGoals.map((g) => (
-                    <GoalDetailCard key={g.id} goal={g} />
+                    <GoalDetailCard key={g.id} goal={g} compact={!!isMobile} />
                   ))}
                 </Stack>
               )}
             </Card>
 
             {(isAdmin || operatorGoals.length > 0) && (
-              <Card padding={16}>
+              <Card padding={cardPad} style={{ minWidth: 0 }}>
                 <SectionHead
                   title={isAdmin ? "Operadores e metas" : "Minhas metas"}
                   subtitle={
@@ -768,7 +932,7 @@ export default function DashboardPage() {
                 ) : (
                   <Stack gap={14}>
                     {operatorGoals.map((g) => (
-                      <GoalDetailCard key={g.id} goal={g} />
+                      <GoalDetailCard key={g.id} goal={g} compact={!!isMobile} />
                     ))}
                   </Stack>
                 )}
@@ -777,23 +941,38 @@ export default function DashboardPage() {
           </SimpleGrid>
 
           {data?.conversionsBySegment && data.conversionsBySegment.length > 0 ? (
-            <Card padding={16}>
+            <Card padding={cardPad} style={{ minWidth: 0, overflow: "hidden" }}>
               <SectionHead
                 title="Conversões por segmento"
                 subtitle={`Onde vale mais investir · ${periodLabel}`}
               />
-              <BarChart
-                h={220}
-                data={data.conversionsBySegment.map((s) => ({
-                  segment: s.segment,
-                  Convertidos: s.count,
-                }))}
-                dataKey="segment"
-                series={[{ name: "Convertidos", color: "orbix.5" }]}
-                tickLine="none"
-                gridAxis="y"
-                barProps={{ radius: 4 }}
-              />
+              <Box style={{ width: "100%", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                <Box style={{ minWidth: isMobile ? 300 : undefined }}>
+                  <BarChart
+                    h={chartHeight}
+                    data={data.conversionsBySegment.map((s) => ({
+                      segment: s.segment,
+                      Convertidos: s.count,
+                    }))}
+                    dataKey="segment"
+                    series={[{ name: "Convertidos", color: "orbix.5" }]}
+                    tickLine="none"
+                    gridAxis="y"
+                    barProps={{ radius: 4 }}
+                    xAxisProps={
+                      isMobile
+                        ? {
+                            interval: 0,
+                            angle: -35,
+                            textAnchor: "end",
+                            height: 70,
+                            tick: { fontSize: 10 },
+                          }
+                        : undefined
+                    }
+                  />
+                </Box>
+              </Box>
             </Card>
           ) : null}
 

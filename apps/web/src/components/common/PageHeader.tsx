@@ -1,7 +1,8 @@
 "use client";
 
 import { Group, Text, Title } from "@mantine/core";
-import { colors } from "@/theme/tokens";
+import { useMediaQuery } from "@mantine/hooks";
+import { colors, layout } from "@/theme/tokens";
 
 export function PageHeader({
   title,
@@ -12,19 +13,29 @@ export function PageHeader({
   subtitle?: string;
   actions?: React.ReactNode;
 }) {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
+
   return (
     <Group
       justify="space-between"
-      align="flex-end"
-      gap="lg"
-      mb={24}
+      align={isMobile ? "stretch" : "flex-end"}
+      gap={isMobile ? "sm" : "lg"}
+      mb={isMobile ? 16 : 24}
       wrap="wrap"
+      style={{ flexDirection: isMobile ? "column" : "row" }}
     >
-      <div>
+      <div style={{ minWidth: 0, width: isMobile ? "100%" : undefined }}>
         <Title
           order={1}
           c={colors.textPrimary}
-          style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em" }}
+          style={{
+            fontSize: isMobile ? 22 : 28,
+            fontWeight: 700,
+            lineHeight: 1.2,
+            letterSpacing: "-0.02em",
+          }}
         >
           {title}
         </Title>
@@ -35,7 +46,7 @@ export function PageHeader({
         ) : null}
       </div>
       {actions ? (
-        <Group gap={8} wrap="wrap">
+        <Group gap={8} wrap="wrap" grow={!!isMobile} w={isMobile ? "100%" : undefined}>
           {actions}
         </Group>
       ) : null}

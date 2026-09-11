@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Badge,
+  Box,
   Button,
   Card,
   Center,
@@ -20,6 +21,7 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { maxJobQuantity } from "@orbixlead/shared";
 import { Ban, MapPin, Search, Trash2 } from "lucide-react";
@@ -33,7 +35,7 @@ import { api, ApiError } from "@/lib/api";
 import type { ScrapingJob, ScrapingResult } from "@/lib/types";
 import { normalizeJobStatus } from "@/lib/types";
 import { unwrapList, unwrapOne } from "@/lib/unwrap";
-import { colors, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
+import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 const statusLabel: Record<string, string> = {
   queued: "Na fila",
@@ -50,8 +52,41 @@ function statusColor(status: string): string {
   return "orbix";
 }
 
+function ResultStatusBadge({ r }: { r: ScrapingResult }) {
+  if (r.leadId) {
+    return (
+      <Badge variant="light" color="green">
+        No CRM
+      </Badge>
+    );
+  }
+  if (r.isDuplicate) {
+    return (
+      <Badge variant="light" color="gray">
+        Já na base
+      </Badge>
+    );
+  }
+  if (r.discarded) {
+    return (
+      <Badge variant="light" color="red">
+        Descartado
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="light" color="orbix">
+      Novo
+    </Badge>
+  );
+}
+
 export default function CapturaPage() {
   const { tenant, refresh } = useAuth();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
+  const cardPad = isMobile ? "md" : "lg";
   const [tab, setTab] = useState<string | null>("nova");
   const [city, setCity] = useState("");
   const [segment, setSegment] = useState("");
@@ -321,26 +356,27 @@ export default function CapturaPage() {
         subtitle="Busque leads no Brasil por cidade e segmentação"
       />
 
-      <Tabs value={tab} onChange={setTab} mb="xl">
-        <Tabs.List>
+      <Tabs value={tab} onChange={setTab} mb={{ base: "md", sm: "xl" }}>
+        <Tabs.List grow={!!isMobile}>
           <Tabs.Tab value="nova">Nova captura</Tabs.Tab>
           <Tabs.Tab value="historico">Histórico</Tabs.Tab>
         </Tabs.List>
 
-        <Tabs.Panel value="nova" pt="lg">
-          <Card padding="lg" mb="xl">
-            <Title order={4} mb="md">
+        <Tabs.Panel value="nova" pt={{ base: "md", sm: "lg" }}>
+          <Card padding={cardPad} mb={{ base: "md", sm: "xl" }} style={{ minWidth: 0 }}>
+            <Title order={4} mb="md" style={{ fontSize: isMobile ? 16 : undefined }}>
               Nova captura
             </Title>
             <form onSubmit={onSubmit}>
-              <SimpleGrid cols={{ base: 1, sm: 2 }} mb="md">
-                <TextInput label="País" value="Brasil" disabled />
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={isMobile ? 12 : "md"} mb="md">
+                <TextInput label="País" value="Brasil" disabled size={isMobile ? "sm" : "md"} />
                 <TextInput
                   label="Cidade"
                   required
                   placeholder="Ex.: São Paulo"
                   value={city}
                   onChange={(e) => setCity(e.currentTarget.value)}
+                  size={isMobile ? "sm" : "md"}
                 />
                 <TextInput
                   label="Segmentação"
@@ -348,6 +384,7 @@ export default function CapturaPage() {
                   placeholder="Ex.: clínicas odontológicas"
                   value={segment}
                   onChange={(e) => setSegment(e.currentTarget.value)}
+                  size={isMobile ? "sm" : "md"}
                 />
                 <NumberInput
                   label="Quantidade"
@@ -356,6 +393,7 @@ export default function CapturaPage() {
                   max={maxQty}
                   value={quantity}
                   onChange={setQuantity}
+                  size={isMobile ? "sm" : "md"}
                   description={
                     unlimited
                       ? `Máximo ${maxQty} por busca`
@@ -363,9 +401,10 @@ export default function CapturaPage() {
                   }
                 />
               </SimpleGrid>
-              <Group justify="flex-end">
+              <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile}>
                 <Button
                   type="submit"
+                  size={isMobile ? "sm" : "md"}
                   leftSection={<Search size={18} />}
                   loading={submitting}
                   disabled={!unlimited && remaining <= 0}
@@ -377,15 +416,15 @@ export default function CapturaPage() {
           </Card>
 
           {job ? (
-            <Card padding="lg" mb="xl">
-              <Group justify="space-between" mb="sm" wrap="wrap">
-                <div>
+            <Card padding={cardPad} mb={{ base: "md", sm: "xl" }} style={{ minWidth: 0 }}>
+              <Group justify="space-between" mb="sm" wrap="wrap" gap="sm" align="flex-start">
+                <Box style={{ minWidth: 0, flex: "1 1 180px" }}>
                   <Text fw={600}>Status da captura</Text>
-                  <Text size="sm" c={colors.textMuted}>
+                  <Text size="sm" c={colors.textMuted} lineClamp={2}>
                     {job.city} · {job.segment} · {job.quantity} leads
                   </Text>
-                </div>
-                <Group gap="sm">
+                </Box>
+                <Group gap="sm" wrap="wrap" w={isMobile ? "100%" : undefined}>
                   <Badge color={statusColor(jobStatus || "")} variant="light">
                     {statusLabel[jobStatus || ""] || job.status}
                   </Badge>
@@ -397,6 +436,7 @@ export default function CapturaPage() {
                       leftSection={<Ban size={14} strokeWidth={ICON_STROKE} />}
                       loading={cancellingId === job.id}
                       onClick={() => setPendingCancel(job)}
+                      style={isMobile ? { flex: 1 } : undefined}
                     >
                       Cancelar
                     </Button>
@@ -428,10 +468,18 @@ export default function CapturaPage() {
           ) : null}
 
           {jobStatus === "completed" ? (
-            <Card padding="lg">
-              <Group justify="space-between" mb="md">
-                <Title order={4}>Resultados</Title>
-                <Group>
+            <Card padding={cardPad} style={{ minWidth: 0 }}>
+              <Stack gap="md" mb="md">
+                <Title order={4} style={{ fontSize: isMobile ? 16 : undefined }}>
+                  Resultados
+                </Title>
+                <Group
+                  gap={8}
+                  wrap="wrap"
+                  grow={!!isMobile}
+                  w={isMobile ? "100%" : undefined}
+                  justify={isMobile ? "stretch" : "flex-end"}
+                >
                   <Button
                     variant="default"
                     size="sm"
@@ -449,13 +497,87 @@ export default function CapturaPage() {
                     Enviar para CRM ({selected.length})
                   </Button>
                 </Group>
-              </Group>
+              </Stack>
 
               {results.length === 0 ? (
                 <EmptyState
                   title="Nenhum resultado"
                   description="Esta captura não retornou leads novos."
                 />
+              ) : isMobile ? (
+                <Stack gap={10}>
+                  {results.map((r) => {
+                    const canSelect =
+                      !r.isDuplicate && !r.discarded && Boolean(r.phoneE164) && !r.leadId;
+                    return (
+                      <Box
+                        key={r.id}
+                        style={{
+                          border: `1px solid ${colors.borderLight}`,
+                          borderRadius: 10,
+                          padding: 12,
+                          background: colors.surface,
+                          minWidth: 0,
+                        }}
+                      >
+                        <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm" mb={8}>
+                          <Group gap={8} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                            <Checkbox
+                              checked={selected.includes(r.id)}
+                              disabled={!canSelect}
+                              onChange={() => toggleSelect(r.id)}
+                              mt={2}
+                            />
+                            <Box style={{ minWidth: 0 }}>
+                              <Group gap={6} wrap="nowrap">
+                                <Text size="sm" fw={600} lineClamp={2} style={{ minWidth: 0 }}>
+                                  {r.companyName}
+                                </Text>
+                                {r.mapsUrl ? (
+                                  <ActionIcon
+                                    component="a"
+                                    href={r.mapsUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    variant="subtle"
+                                    color="gray"
+                                    size="sm"
+                                    aria-label="Abrir no Google Maps"
+                                    style={{ flexShrink: 0 }}
+                                  >
+                                    <MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+                                  </ActionIcon>
+                                ) : null}
+                              </Group>
+                              <Text size="xs" c={colors.textMuted} mt={2}>
+                                {r.city || "—"}
+                              </Text>
+                            </Box>
+                          </Group>
+                          <ResultStatusBadge r={r} />
+                        </Group>
+
+                        <Group gap={8} wrap="wrap" mb={10}>
+                          <Text size="sm">{r.phoneE164 || r.phoneRaw || "—"}</Text>
+                          <TemperatureBadge value={r.temperature} />
+                        </Group>
+
+                        <Button
+                          variant="subtle"
+                          color="red"
+                          size="compact-sm"
+                          fullWidth
+                          leftSection={<Trash2 size={14} />}
+                          onClick={() =>
+                            setPendingDelete({ id: r.id, name: r.companyName })
+                          }
+                        >
+                          Excluir
+                        </Button>
+                      </Box>
+                    );
+                  })}
+                </Stack>
               ) : (
                 <Table.ScrollContainer minWidth={720}>
                   <Table verticalSpacing="sm" highlightOnHover>
@@ -517,23 +639,7 @@ export default function CapturaPage() {
                               <TemperatureBadge value={r.temperature} />
                             </Table.Td>
                             <Table.Td>
-                              {r.leadId ? (
-                                <Badge variant="light" color="green">
-                                  No CRM
-                                </Badge>
-                              ) : r.isDuplicate ? (
-                                <Badge variant="light" color="gray">
-                                  Já na base
-                                </Badge>
-                              ) : r.discarded ? (
-                                <Badge variant="light" color="red">
-                                  Descartado
-                                </Badge>
-                              ) : (
-                                <Badge variant="light" color="orbix">
-                                  Novo
-                                </Badge>
-                              )}
+                              <ResultStatusBadge r={r} />
                             </Table.Td>
                             <Table.Td>
                               <Button
@@ -559,8 +665,8 @@ export default function CapturaPage() {
           ) : null}
         </Tabs.Panel>
 
-        <Tabs.Panel value="historico" pt="lg">
-          <Card padding={0}>
+        <Tabs.Panel value="historico" pt={{ base: "md", sm: "lg" }}>
+          <Card padding={isMobile ? "sm" : 0} style={{ minWidth: 0 }}>
             {historyLoading ? (
               <Center mih={200}>
                 <Loader color="orbix" />
@@ -570,6 +676,108 @@ export default function CapturaPage() {
                 title="Nenhuma captura ainda"
                 description="As filas geradas aparecerão aqui com cidade, segmento e status."
               />
+            ) : isMobile ? (
+              <Stack gap={10}>
+                {history.map((row) => {
+                  const st = normalizeJobStatus(row.status);
+                  const cancellable = st === "queued" || st === "running";
+                  return (
+                      <Box
+                        key={row.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => void openHistoryJob(row)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            void openHistoryJob(row);
+                          }
+                        }}
+                        style={{
+                          border: `1px solid ${colors.borderLight}`,
+                          borderRadius: 10,
+                          padding: 12,
+                          background: colors.surface,
+                          cursor: "pointer",
+                          minWidth: 0,
+                        }}
+                      >
+                        <Group justify="space-between" align="flex-start" gap="sm" mb={8} wrap="nowrap">
+                          <Box style={{ minWidth: 0, flex: 1 }}>
+                            <Text size="sm" fw={700} lineClamp={1}>
+                              {row.city}
+                            </Text>
+                            <Text size="xs" c={colors.textMuted} lineClamp={2}>
+                              {row.segment}
+                            </Text>
+                          </Box>
+                          <Badge color={statusColor(st)} variant="light" style={{ flexShrink: 0 }}>
+                            {statusLabel[st] || row.status}
+                          </Badge>
+                        </Group>
+
+                        <SimpleGrid cols={2} spacing={8} mb={cancellable ? 10 : 0}>
+                          <Box>
+                            <Text size="xs" c={colors.textMuted}>
+                              Data
+                            </Text>
+                            <Text size="sm">
+                              {dayjs(row.createdAt).format("DD/MM/YY HH:mm")}
+                            </Text>
+                          </Box>
+                          <Box>
+                            <Text size="xs" c={colors.textMuted}>
+                              Quantidade
+                            </Text>
+                            <Text size="sm">{row.quantity}</Text>
+                          </Box>
+                          <Box>
+                            <Text size="xs" c={colors.textMuted}>
+                              Resultados
+                            </Text>
+                            <Text size="sm" c={colors.textSecondary} lineClamp={2}>
+                              {st === "completed"
+                                ? `${row.newCount} novos · ${row.existingCount} base`
+                                : "—"}
+                            </Text>
+                          </Box>
+                          <Box>
+                            <Text size="xs" c={colors.textMuted}>
+                              Créditos
+                            </Text>
+                            <Text size="sm">
+                              {row.settledCredits}/{row.reservedCredits}
+                            </Text>
+                          </Box>
+                        </SimpleGrid>
+
+                        {(st === "failed" || st === "cancelled") && row.errorMessage ? (
+                          <Text size="xs" c={colors.textMuted} mt={8} lineClamp={2}>
+                            {row.errorMessage}
+                          </Text>
+                        ) : null}
+
+                        {cancellable ? (
+                          <Button
+                            mt={10}
+                            fullWidth
+                            size="compact-sm"
+                            variant="light"
+                            color="red"
+                            leftSection={<Ban size={14} strokeWidth={ICON_STROKE} />}
+                            loading={cancellingId === row.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingCancel(row);
+                            }}
+                          >
+                            Cancelar fila
+                          </Button>
+                        ) : null}
+                      </Box>
+                  );
+                })}
+              </Stack>
             ) : (
               <Table.ScrollContainer minWidth={960}>
                 <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
