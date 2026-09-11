@@ -296,6 +296,7 @@ async function main() {
       tenantId: tenant.id,
       name: "Conversões mensais — SP",
       periodType: "MONTHLY",
+      scope: "COMPANY",
       year,
       month,
       targetConversions: 40,

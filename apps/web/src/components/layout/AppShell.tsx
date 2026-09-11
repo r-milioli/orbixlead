@@ -41,6 +41,7 @@ import {
 import type { Role } from "@orbixlead/shared";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notifications-events";
 import type { AppNotification } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
@@ -134,6 +135,12 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Metas",
         href: "/metas",
         icon: Target,
+        roles: ["admin", "operador"],
+      },
+      {
+        label: "Notificações",
+        href: "/notificacoes",
+        icon: Bell,
         roles: ["admin", "operador"],
       },
     ],
@@ -287,14 +294,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarCollapsed = collapsed && !isMobile;
   const sidebarWidth = sidebarCollapsed ? layout.sidebarCollapsed : layout.sidebarExpanded;
-  const unread = notifications.filter((n) => !n.readAt).length;
+  const unread = notifications.length;
 
   const loadNotifications = async () => {
     setNotifLoading(true);
     try {
-      const data = await api("/api/v1/notifications");
+      const data = await api<{ notifications: AppNotification[]; unreadCount?: number }>(
+        "/api/v1/notifications?status=unread&take=50"
+      );
       const list = unwrapList<AppNotification>(data, "notifications");
-      setNotifications(list);
+      setNotifications(list.filter((n) => !n.readAt));
     } catch {
       setNotifications([]);
     } finally {
@@ -307,12 +316,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     void loadNotifications();
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!user || user.role === "super_admin") return;
+    const onChanged = () => void loadNotifications();
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onChanged);
+  }, [user?.id]);
+
   const markRead = async (id: string) => {
     try {
       await api(`/api/v1/notifications/${id}/read`, { method: "PATCH" });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
-      );
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch {
       /* ignore */
     }
@@ -321,9 +336,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const markAllRead = async () => {
     try {
       await api("/api/v1/notifications/read-all", { method: "POST" });
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() }))
-      );
+      setNotifications([]);
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch {
       /* ignore */
     }
@@ -547,7 +561,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Menu.Dropdown>
                   <Group justify="space-between" px="sm" py={6}>
                     <Text size="sm" fw={600}>
-                      Notificações
+                      Não lidas
                     </Text>
                     {unread > 0 ? (
                       <UnstyledButton onClick={() => void markAllRead()}>
@@ -564,7 +578,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </Group>
                   ) : notifications.length === 0 ? (
                     <Text size="sm" c={colors.textMuted} p="md" ta="center">
-                      Nenhuma notificação
+                      Nenhuma notificação nova
                     </Text>
                   ) : (
                     <ScrollArea.Autosize mah={280}>
@@ -572,20 +586,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <Menu.Item
                           key={n.id}
                           onClick={() => void markRead(n.id)}
-                          style={{
-                            background: n.readAt ? undefined : colors.primaryLight,
-                          }}
+                          style={{ background: colors.primaryLight }}
                         >
                           <Stack gap={2}>
                             <Group justify="space-between" wrap="nowrap">
                               <Text size="sm" fw={600} lineClamp={1}>
                                 {n.title}
                               </Text>
-                              {!n.readAt ? (
-                                <Badge size="xs" variant="filled" color="orbix">
-                                  Nova
-                                </Badge>
-                              ) : null}
+                              <Badge size="xs" variant="filled" color="orbix">
+                                Nova
+                              </Badge>
                             </Group>
                             <Text size="xs" c={colors.textMuted} lineClamp={2}>
                               {n.body}
@@ -595,6 +605,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       ))}
                     </ScrollArea.Autosize>
                   )}
+                  <Divider />
+                  <Menu.Item component={Link} href="/notificacoes">
+                    <Text size="sm" c={colors.primary} ta="center" w="100%">
+                      Ver todas as notificações
+                    </Text>
+                  </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
             ) : null}

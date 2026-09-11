@@ -110,6 +110,7 @@ export type Goal = {
   custoPorConversao: number | string;
   convertedCount?: number;
   children?: Goal[];
+  createdAt?: string;
 };
 
 export type AppNotification = {
@@ -121,24 +122,60 @@ export type AppNotification = {
 };
 
 export type DashboardData = {
+  scope?: "company" | "operator";
   kpis?: {
-    leadsTotal?: number;
-    leadsPeriod?: number;
-    converted?: number;
     conversionRate?: number;
     costPerConversion?: number | null;
-    scheduled?: number;
-    contacted?: number;
+    leadsLast7Days?: number;
+    convertedLast7Days?: number;
+    importedToday?: number;
+    convertedToday?: number;
   };
   funnel?: { slug: string; label: string; count: number }[];
-  prospecting?: { date: string; count: number }[];
-  bySegment?: { segment: string; converted: number; total: number }[];
-  goalsProgress?: {
+  period?: {
+    importedLeads?: number;
+    conversions?: number;
+    avgLeadCost?: number;
+    costPerConversion?: number | null;
+  };
+  goal?: {
     id: string;
     name: string;
     target: number;
     current: number;
+    progress: number;
+    scope?: "company" | "operator";
+    assigneeId?: string | null;
+    assignee?: { id: string; name: string; email: string } | null;
+  } | null;
+  availableGoals?: {
+    id: string;
+    name: string;
+    scope: "company" | "operator";
+    assigneeId?: string | null;
+    assignee?: { id: string; name: string; email: string } | null;
+    target: number;
+    current: number;
+    progress: number;
   }[];
+  companyGoals?: {
+    id: string;
+    name: string;
+    target: number;
+    current: number;
+    progress: number;
+  }[];
+  operatorGoals?: {
+    id: string;
+    name: string;
+    target: number;
+    current: number;
+    progress: number;
+    assignee?: { id: string; name: string; email: string } | null;
+  }[];
+  prospection30d?: { day: string; imported: number; converted: number }[];
+  conversionsBySegment?: { segment: string; count: number }[];
+  upcomingSchedules?: number;
 };
 
 export type TenantAdmin = {
