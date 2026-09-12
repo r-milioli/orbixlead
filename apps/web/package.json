@@ -22,12 +22,12 @@
     "recharts": "^2.15.1"
   },
   "devDependencies": {
-    "@types/node": "^22.13.10",
+    "@types/node": "^26.5.0",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
     "postcss": "^8.5.3",
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
-    "typescript": "^5.8.2"
+    "typescript": "^7.0.2"
   }
 }
