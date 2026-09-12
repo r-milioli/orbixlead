@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
   Badge,
+  Box,
   Button,
   Card,
   Center,
@@ -14,9 +15,9 @@ import {
   Text,
   TextInput,
   PasswordInput,
-  Title,
   Modal,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { CREDIT_PACKAGES } from "@orbixlead/shared";
 import { Building2, Plus } from "lucide-react";
@@ -26,10 +27,13 @@ import { useAuth } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import type { TenantAdmin } from "@/lib/types";
 import { unwrapList } from "@/lib/unwrap";
-import { colors } from "@/theme/tokens";
+import { colors, layout } from "@/theme/tokens";
 
 export default function SuperAdminTenantsPage() {
   const { isSuperAdmin, loading: authLoading } = useAuth();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [tenants, setTenants] = useState<TenantAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [opened, setOpened] = useState(false);
@@ -140,14 +144,24 @@ export default function SuperAdminTenantsPage() {
     );
   }
 
+  const fieldSize = isMobile ? "sm" : "md";
+
   return (
     <>
       <PageHeader
         title="Tenants"
-        subtitle="Criar contas, liberar pacotes e modo ilimitado"
+        subtitle={
+          isMobile
+            ? "Contas, pacotes e modo ilimitado"
+            : "Criar contas, liberar pacotes e modo ilimitado"
+        }
         actions={
-          <Button leftSection={<Plus size={16} />} onClick={() => setOpened(true)}>
-            Novo tenant
+          <Button
+            size={fieldSize}
+            leftSection={<Plus size={16} />}
+            onClick={() => setOpened(true)}
+          >
+            {isMobile ? "Novo" : "Novo tenant"}
           </Button>
         }
       />
@@ -167,8 +181,62 @@ export default function SuperAdminTenantsPage() {
             </Button>
           }
         />
+      ) : isMobile ? (
+        <Stack gap={10}>
+          {tenants.map((t) => (
+            <Card key={t.id} padding="sm" withBorder style={{ minWidth: 0 }}>
+              <Stack gap="sm">
+                <Box style={{ minWidth: 0 }}>
+                  <Text fw={600} lineClamp={2} style={{ wordBreak: "break-word" }}>
+                    {t.name}
+                  </Text>
+                  <Text size="xs" c={colors.textMuted} lineClamp={1} style={{ wordBreak: "break-all" }}>
+                    {t.id}
+                  </Text>
+                </Box>
+
+                <Group gap="sm" wrap="wrap" justify="space-between">
+                  {t.unlimited ? (
+                    <Badge color="orbix" variant="light">
+                      Ilimitado
+                    </Badge>
+                  ) : (
+                    <Text size="sm" fw={600}>
+                      {t.creditRemaining.toLocaleString("pt-BR")} /{" "}
+                      {t.creditCap.toLocaleString("pt-BR")}
+                    </Text>
+                  )}
+                  <Switch
+                    checked={t.unlimited}
+                    onChange={() => void toggleUnlimited(t)}
+                    label={t.unlimited ? "Livre" : "Off"}
+                    size="sm"
+                  />
+                </Group>
+
+                <div>
+                  <Text size="xs" c={colors.textMuted} mb={6}>
+                    Pacotes
+                  </Text>
+                  <Group gap={6} grow>
+                    {CREDIT_PACKAGES.map((pkg) => (
+                      <Button
+                        key={pkg}
+                        size="compact-sm"
+                        variant="light"
+                        onClick={() => void grant(t.id, pkg)}
+                      >
+                        {pkg.toLocaleString("pt-BR")}
+                      </Button>
+                    ))}
+                  </Group>
+                </div>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
       ) : (
-        <Card padding={0} withBorder>
+        <Card padding={0} withBorder style={{ minWidth: 0 }}>
           <Table.ScrollContainer minWidth={900}>
             <Table verticalSpacing="md" horizontalSpacing="md">
               <Table.Thead>
@@ -229,7 +297,13 @@ export default function SuperAdminTenantsPage() {
         </Card>
       )}
 
-      <Modal opened={opened} onClose={() => setOpened(false)} title="Novo tenant">
+      <Modal
+        opened={opened}
+        onClose={() => setOpened(false)}
+        title="Novo tenant"
+        centered
+        fullScreen={!!isMobile}
+      >
         <form onSubmit={createTenant}>
           <Stack gap="md">
             <TextInput
@@ -237,12 +311,14 @@ export default function SuperAdminTenantsPage() {
               required
               value={name}
               onChange={(e) => setName(e.currentTarget.value)}
+              size={fieldSize}
             />
             <TextInput
               label="Nome do admin"
               required
               value={adminName}
               onChange={(e) => setAdminName(e.currentTarget.value)}
+              size={fieldSize}
             />
             <TextInput
               label="E-mail do admin"
@@ -250,14 +326,16 @@ export default function SuperAdminTenantsPage() {
               required
               value={adminEmail}
               onChange={(e) => setAdminEmail(e.currentTarget.value)}
+              size={fieldSize}
             />
             <PasswordInput
               label="Senha inicial do admin"
               required
               value={adminPassword}
               onChange={(e) => setAdminPassword(e.currentTarget.value)}
+              size={fieldSize}
             />
-            <Group justify="flex-end">
+            <Group justify={isMobile ? "stretch" : "flex-end"} grow={!!isMobile} wrap="wrap">
               <Button variant="default" onClick={() => setOpened(false)}>
                 Cancelar
               </Button>

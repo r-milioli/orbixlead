@@ -2,8 +2,9 @@
 
 import { ReactNode } from "react";
 import { Paper, Stack, Text } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { BrandLogo } from "@/components/common/BrandLogo";
-import { colors } from "@/theme/tokens";
+import { colors, layout } from "@/theme/tokens";
 
 type AuthShellProps = {
   subtitle: string;
@@ -12,20 +13,32 @@ type AuthShellProps = {
 };
 
 export function AuthShell({ subtitle, children, footer }: AuthShellProps) {
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
+
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
         display: "grid",
         placeItems: "center",
-        padding: 24,
+        padding: isMobile ? "16px 12px" : 24,
         background: `linear-gradient(180deg, ${colors.primaryLight} 0%, ${colors.background} 42%)`,
       }}
     >
-      <Paper w="100%" maw={420} p="xl" withBorder radius="md" shadow="sm">
-        <Stack gap="lg">
+      <Paper
+        w="100%"
+        maw={420}
+        p={isMobile ? "md" : "xl"}
+        withBorder
+        radius="md"
+        shadow="sm"
+        style={{ minWidth: 0 }}
+      >
+        <Stack gap={isMobile ? "md" : "lg"}>
           <div>
-            <BrandLogo size={44} wordmarkAs="title" priority />
+            <BrandLogo size={isMobile ? 36 : 44} wordmarkAs="title" priority />
             <Text size="sm" c={colors.textSecondary} mt={8}>
               {subtitle}
             </Text>

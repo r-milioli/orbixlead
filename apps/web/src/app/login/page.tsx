@@ -3,15 +3,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Anchor, Button, Center, Loader, PasswordInput, Stack, TextInput } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { AuthShell } from "@/components/common/AuthShell";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { colors } from "@/theme/tokens";
+import { colors, layout } from "@/theme/tokens";
 
 export default function LoginPage() {
   const { login, loading, needsSetup, user } = useAuth();
   const router = useRouter();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -78,6 +82,8 @@ export default function LoginPage() {
     );
   }
 
+  const fieldSize = isMobile ? "sm" : "md";
+
   return (
     <AuthShell subtitle={forgotMode ? "Recuperar acesso" : "Entre na sua conta"}>
       <form onSubmit={onSubmit}>
@@ -89,6 +95,8 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.currentTarget.value)}
             placeholder="voce@empresa.com"
+            size={fieldSize}
+            autoComplete="email"
           />
           {!forgotMode ? (
             <PasswordInput
@@ -97,9 +105,11 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.currentTarget.value)}
               placeholder="Sua senha"
+              size={fieldSize}
+              autoComplete="current-password"
             />
           ) : null}
-          <Button type="submit" fullWidth loading={submitting}>
+          <Button type="submit" fullWidth loading={submitting} size={fieldSize}>
             {forgotMode ? "Enviar link" : "Entrar"}
           </Button>
         </Stack>
@@ -111,6 +121,7 @@ export default function LoginPage() {
         size="sm"
         c={colors.primary}
         onClick={() => setForgotMode((v) => !v)}
+        style={{ alignSelf: "flex-start" }}
       >
         {forgotMode ? "Voltar ao login" : "Esqueci minha senha"}
       </Anchor>

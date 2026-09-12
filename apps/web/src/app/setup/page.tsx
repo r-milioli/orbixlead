@@ -3,15 +3,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Center, Loader, PasswordInput, Stack, TextInput } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { AuthShell } from "@/components/common/AuthShell";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { colors } from "@/theme/tokens";
+import { colors, layout } from "@/theme/tokens";
 
 export default function SetupPage() {
   const { setup, loading, needsSetup, user } = useAuth();
   const router = useRouter();
+  const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
+    getInitialValueInEffect: true,
+  });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -68,8 +72,16 @@ export default function SetupPage() {
     );
   }
 
+  const fieldSize = isMobile ? "sm" : "md";
+
   return (
-    <AuthShell subtitle="Primeiro acesso — crie o super admin da plataforma.">
+    <AuthShell
+      subtitle={
+        isMobile
+          ? "Crie o super admin da plataforma."
+          : "Primeiro acesso — crie o super admin da plataforma."
+      }
+    >
       <form onSubmit={onSubmit}>
         <Stack gap="md">
           <TextInput
@@ -78,6 +90,8 @@ export default function SetupPage() {
             value={name}
             onChange={(e) => setName(e.currentTarget.value)}
             placeholder="Seu nome"
+            size={fieldSize}
+            autoComplete="name"
           />
           <TextInput
             label="E-mail"
@@ -86,6 +100,8 @@ export default function SetupPage() {
             value={email}
             onChange={(e) => setEmail(e.currentTarget.value)}
             placeholder="admin@suaempresa.com"
+            size={fieldSize}
+            autoComplete="email"
           />
           <PasswordInput
             label="Senha"
@@ -93,6 +109,8 @@ export default function SetupPage() {
             value={password}
             onChange={(e) => setPassword(e.currentTarget.value)}
             placeholder="Mínimo 8 caracteres"
+            size={fieldSize}
+            autoComplete="new-password"
           />
           <PasswordInput
             label="Confirmar senha"
@@ -100,8 +118,10 @@ export default function SetupPage() {
             value={confirm}
             onChange={(e) => setConfirm(e.currentTarget.value)}
             placeholder="Repita a senha"
+            size={fieldSize}
+            autoComplete="new-password"
           />
-          <Button type="submit" fullWidth loading={submitting}>
+          <Button type="submit" fullWidth loading={submitting} size={fieldSize}>
             Criar super admin
           </Button>
         </Stack>
