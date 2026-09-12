@@ -1,0 +1,70 @@
+# QLTY-02: pipeline de CI com gates de qualidade e segurança.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @orbixlead/shared build
+
+      - name: Generate Prisma client
+        run: pnpm --filter @orbixlead/api prisma:generate
+
+      - name: Typecheck / build (api)
+        run: pnpm --filter @orbixlead/api build
+
+      - name: Typecheck / build (scraper)
+        run: pnpm --filter @orbixlead/scraper build
+
+      - name: Build (web)
+        run: pnpm --filter @orbixlead/web build
+        env:
+          DOCKER_BUILD: "1"
+
+      # QLTY-01: falha em vulnerabilidades altas/críticas nas dependências.
+      - name: Dependency audit
+        run: pnpm audit --audit-level high
+
+  trivy-fs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scan de vulnerabilidades no filesystem (deps + IaC/Dockerfiles).
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0" # relatório; troque para "1" para bloquear o merge
+          format: table

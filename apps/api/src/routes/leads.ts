@@ -147,7 +147,7 @@ router.get(
       [
         l.id,
         csvEscape(l.companyName),
-        l.phoneE164,
+        csvEscape(l.phoneE164),
         tempToApi[l.temperature],
         l.stage.slug,
         csvEscape(l.city),
@@ -246,7 +246,7 @@ router.post(
         stageId: z.string().optional(),
         rating: z.number().min(0).max(5).optional(),
         reviewCount: z.number().int().min(0).optional(),
-        socialUrls: z.array(z.string()).optional(),
+        socialUrls: z.array(z.string()).max(50).optional(),
       })
       .parse(req.body);
 
@@ -618,8 +618,14 @@ router.delete(
 );
 
 function csvEscape(value: string) {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  // SEC-07: neutraliza injeção de fórmula (Excel/Sheets). Campos que iniciam com
+  // = + - @ (ou TAB/CR) são prefixados com apóstrofo para não serem interpretados.
+  let v = value;
+  if (/^[=+\-@\t\r]/.test(v)) {
+    v = `'${v}`;
+  }
+  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
 }
 
 export default router;

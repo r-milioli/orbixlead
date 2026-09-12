@@ -368,85 +368,87 @@ export default function LeadDetailPage() {
           </Group>
         </Box>
 
-        <Stack gap={8}>
-          <Group gap={8} grow={!!isMobile} wrap="wrap">
+        <Group gap={8} grow={!!isMobile} wrap={isMobile ? "wrap" : "nowrap"} style={{ width: "100%" }}>
+          <Button
+            variant="default"
+            size={isMobile ? "sm" : "md"}
+            leftSection={<Phone size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+            component="a"
+            href={`tel:${lead.phoneE164}`}
+            style={isMobile ? undefined : { flex: "0 0 auto" }}
+          >
+            Ligar
+          </Button>
+          <Button
+            size={isMobile ? "sm" : "md"}
+            leftSection={<MessageCircle size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+            onClick={() => setWaOpen(true)}
+            style={isMobile ? undefined : { flex: "0 0 auto" }}
+          >
+            WhatsApp
+          </Button>
+          {lead.mapsUrl ? (
             <Button
-              variant="default"
+              variant="light"
               size={isMobile ? "sm" : "md"}
-              leftSection={<Phone size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+              leftSection={<MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
               component="a"
-              href={`tel:${lead.phoneE164}`}
+              href={lead.mapsUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={isMobile ? undefined : { flex: "0 0 auto" }}
             >
-              Ligar
+              Maps
             </Button>
+          ) : null}
+          {lead.closedAt ? (
             <Button
+              variant="light"
               size={isMobile ? "sm" : "md"}
-              leftSection={<MessageCircle size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-              onClick={() => setWaOpen(true)}
+              leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+              loading={reopening}
+              onClick={() => void reopenLead()}
+              style={isMobile ? undefined : { flex: "0 0 auto" }}
             >
-              WhatsApp
+              Reabrir
             </Button>
-            {lead.mapsUrl ? (
+          ) : (
+            <>
               <Button
                 variant="light"
+                color="green"
                 size={isMobile ? "sm" : "md"}
-                leftSection={<MapPin size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                component="a"
-                href={lead.mapsUrl}
-                target="_blank"
-                rel="noreferrer"
+                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                onClick={() => setPendingCloseReason("converted")}
+                style={isMobile ? undefined : { flex: "0 0 auto" }}
               >
-                Maps
+                Converter
               </Button>
-            ) : null}
-          </Group>
-
-          <Group gap={8} grow={!!isMobile} wrap="wrap">
-            {lead.closedAt ? (
               <Button
                 variant="light"
+                color="gray"
                 size={isMobile ? "sm" : "md"}
-                leftSection={<RotateCcw size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                loading={reopening}
-                onClick={() => void reopenLead()}
+                leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+                onClick={() => setPendingCloseReason("lost")}
+                style={isMobile ? undefined : { flex: "0 0 auto" }}
               >
-                Reabrir
+                Perder
               </Button>
-            ) : (
-              <>
-                <Button
-                  variant="light"
-                  color="green"
-                  size={isMobile ? "sm" : "md"}
-                  leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                  onClick={() => setPendingCloseReason("converted")}
-                >
-                  Converter
-                </Button>
-                <Button
-                  variant="light"
-                  color="gray"
-                  size={isMobile ? "sm" : "md"}
-                  leftSection={<Archive size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                  onClick={() => setPendingCloseReason("lost")}
-                >
-                  Perder
-                </Button>
-              </>
-            )}
-            {isAdmin ? (
-              <Button
-                color="red"
-                variant="light"
-                size={isMobile ? "sm" : "md"}
-                leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
-                onClick={() => setConfirmDeleteOpen(true)}
-              >
-                Excluir
-              </Button>
-            ) : null}
-          </Group>
-        </Stack>
+            </>
+          )}
+          {isAdmin ? (
+            <Button
+              color="red"
+              variant="light"
+              size={isMobile ? "sm" : "md"}
+              leftSection={<Trash2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />}
+              onClick={() => setConfirmDeleteOpen(true)}
+              style={isMobile ? undefined : { flex: "0 0 auto" }}
+            >
+              Excluir
+            </Button>
+          ) : null}
+        </Group>
       </Stack>
 
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing={isMobile ? "md" : "lg"}>

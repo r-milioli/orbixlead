@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ActionIcon,
   Badge,
@@ -83,11 +84,13 @@ function ResultStatusBadge({ r }: { r: ScrapingResult }) {
 
 export default function CapturaPage() {
   const { tenant, refresh } = useAuth();
+  const searchParams = useSearchParams();
   const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
     getInitialValueInEffect: true,
   });
   const cardPad = isMobile ? "md" : "lg";
-  const [tab, setTab] = useState<string | null>("nova");
+  const initialTab = searchParams.get("tab") === "historico" ? "historico" : "nova";
+  const [tab, setTab] = useState<string | null>(initialTab);
   const [city, setCity] = useState("");
   const [segment, setSegment] = useState("");
   const [quantity, setQuantity] = useState<number | string>(20);

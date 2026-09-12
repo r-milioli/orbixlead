@@ -778,7 +778,18 @@ export default function DashboardPage() {
           </SimpleGrid>
 
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={isMobile ? 12 : 16}>
-            <Card padding={cardPad} style={{ minWidth: 0 }}>
+            <Card
+              padding={cardPad}
+              component={Link}
+              href="/captura?tab=historico"
+              style={{
+                minWidth: 0,
+                textDecoration: "none",
+                color: "inherit",
+                cursor: "pointer",
+                transition: "border-color 120ms ease, box-shadow 120ms ease",
+              }}
+            >
               <Text size="sm" c={colors.textMuted} style={{ fontSize: isMobile ? 12 : 13 }}>
                 {isCurrentMonth ? "Buscas hoje" : "Buscas no mês"}
               </Text>
@@ -801,7 +812,18 @@ export default function DashboardPage() {
                 leads novos na captura
               </Text>
             </Card>
-            <Card padding={cardPad} style={{ minWidth: 0 }}>
+            <Card
+              padding={cardPad}
+              component={Link}
+              href="/leads?tab=pipeline&created=today"
+              style={{
+                minWidth: 0,
+                textDecoration: "none",
+                color: "inherit",
+                cursor: "pointer",
+                transition: "border-color 120ms ease, box-shadow 120ms ease",
+              }}
+            >
               <Text size="sm" c={colors.textMuted} style={{ fontSize: isMobile ? 12 : 13 }}>
                 {isCurrentMonth ? "Importados hoje" : "Importados no mês"}
               </Text>

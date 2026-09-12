@@ -12,8 +12,25 @@ import {
   hasSuperAdmin,
   SuperAdminSetupError,
 } from "../lib/bootstrap-super-admin";
+import { loginLimiter, sensitiveAuthLimiter } from "../middleware/rate-limit";
+import { destroyUserSessions } from "../lib/session-store";
+import { passwordSchema } from "../lib/validators";
 
 const router = Router();
+
+/**
+ * SEC-06: regenera o ID de sessão antes de autenticar (mitiga session fixation)
+ * e grava o userId na nova sessão.
+ */
+async function establishSession(req: AuthedRequest, userId: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    req.session.regenerate((err) => (err ? reject(err) : resolve()));
+  });
+  req.session.userId = userId;
+  await new Promise<void>((resolve, reject) => {
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+}
 
 router.get(
   "/setup-status",
@@ -24,18 +41,19 @@ router.get(
 
 router.post(
   "/setup",
+  sensitiveAuthLimiter,
   asyncHandler(async (req, res) => {
     const body = z
       .object({
         name: z.string().min(2).max(80),
         email: z.string().email(),
-        password: z.string().min(8),
+        password: passwordSchema,
       })
       .parse(req.body);
 
     try {
       const user = await createFirstSuperAdmin(body);
-      req.session.userId = user.id;
+      await establishSession(req, user.id);
       return res.status(201).json({ user: serializeUser(user) });
     } catch (err) {
       if (err instanceof SuperAdminSetupError) {
@@ -48,6 +66,7 @@ router.post(
 
 router.post(
   "/login",
+  loginLimiter,
   asyncHandler(async (req, res) => {
     const body = z
       .object({
@@ -66,7 +85,7 @@ router.post(
       return res.status(401).json({ error: "Credenciais inválidas" });
     }
 
-    req.session.userId = user.id;
+    await establishSession(req, user.id);
     return res.json({ user: serializeUser(user) });
   })
 );
@@ -92,6 +111,7 @@ router.get(
 
 router.post(
   "/forgot-password",
+  sensitiveAuthLimiter,
   asyncHandler(async (req, res) => {
     const body = z.object({ email: z.string().email() }).parse(req.body);
     const user = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } });
@@ -111,17 +131,21 @@ router.post(
       });
     }
 
+    // SEC-11: pequeno jitter para reduzir enumeração por timing (usuário existe vs não).
+    await new Promise((resolve) => setTimeout(resolve, 50 + Math.floor(Math.random() * 150)));
+
     return res.json({ ok: true });
   })
 );
 
 router.post(
   "/reset-password",
+  sensitiveAuthLimiter,
   asyncHandler(async (req, res) => {
     const body = z
       .object({
         token: z.string().min(10),
-        password: z.string().min(8),
+        password: passwordSchema,
       })
       .parse(req.body);
 
@@ -139,18 +163,22 @@ router.post(
       }),
     ]);
 
+    // SEC-08: após redefinir a senha, invalida todas as sessões ativas do usuário.
+    await destroyUserSessions(reset.userId);
+
     return res.json({ ok: true });
   })
 );
 
 router.post(
   "/accept-invite",
+  sensitiveAuthLimiter,
   asyncHandler(async (req, res) => {
     const body = z
       .object({
         token: z.string().min(10),
         name: z.string().min(2),
-        password: z.string().min(8),
+        password: passwordSchema,
       })
       .parse(req.body);
 
@@ -207,7 +235,7 @@ router.post(
       return createdOrUpdated;
     });
 
-    req.session.userId = user.id;
+    await establishSession(req, user.id);
     return res.json({ user: serializeUser(user) });
   })
 );

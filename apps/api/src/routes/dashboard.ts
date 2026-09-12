@@ -3,6 +3,12 @@ import { creditUiState, goalMetrics } from "@orbixlead/shared";
 import { GoalPeriodType, GoalScope, LeadClosedReason, Role } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler } from "../lib/serialize";
+import {
+  zonedDayKey,
+  zonedLastDayOfMonth,
+  zonedMonthRange,
+  zonedTodayRange,
+} from "../lib/timezone";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
 
 const router = Router();
@@ -11,20 +17,15 @@ router.use(requireAuth, requireTenant, requireRole(Role.ADMIN, Role.OPERADOR));
 
 const COMPANY_VIEW = "__company__";
 
-function localDayKey(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 function goalProgress(current: number, target: number) {
   return target > 0 ? Math.min(1, current / target) : 0;
 }
 
 function parsePeriod(query: AuthedRequest["query"], now: Date) {
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  // Ano/mês civis no fuso do app (não no UTC do container).
+  const today = zonedTodayRange(now);
+  const currentYear = today.year;
+  const currentMonth = today.month;
   let year = Number(query.year);
   let month = Number(query.month);
   if (!Number.isInteger(year) || year < 2020 || year > currentYear + 1) {
@@ -53,17 +54,15 @@ router.get(
     const now = new Date();
     const { year, month, isCurrentMonth } = parsePeriod(req.query, now);
 
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 1);
+    const { start: monthStart, end: monthEnd } = zonedMonthRange(year, month);
 
-    // "Hoje" / últimos 7 dias: no mês corrente usa o dia real; em mês passado usa o fim do mês.
-    const refDay = isCurrentMonth
-      ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      : new Date(year, month, 0);
-    const dayStart = new Date(refDay.getFullYear(), refDay.getMonth(), refDay.getDate());
-    const dayEnd = new Date(refDay.getFullYear(), refDay.getMonth(), refDay.getDate() + 1);
-    const weekStart = new Date(dayStart);
-    weekStart.setDate(weekStart.getDate() - 6);
+    // "Hoje" / últimos 7 dias: no mês corrente usa o dia real (BRT);
+    // em mês passado usa o último dia civil daquele mês.
+    const todayRange = zonedTodayRange(now);
+    const lastDay = zonedLastDayOfMonth(year, month);
+    const dayStart = isCurrentMonth ? todayRange.start : lastDay.dayStart;
+    const dayEnd = isCurrentMonth ? todayRange.end : lastDay.dayEnd;
+    const weekStart = new Date(dayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
     if (weekStart < monthStart) {
       weekStart.setTime(monthStart.getTime());
     }
@@ -166,12 +165,13 @@ router.get(
       captureJobsMonth,
     ] = await Promise.all([
       prisma.lead.count({ where: convertedWhere(monthStart, monthEnd) }),
+      // Importados = enviados ao CRM (createdAt). Não filtra por assignee:
+      // leads recém-importados ainda não têm operador responsável.
       prisma.lead.count({
         where: {
           tenantId,
           softDeletedAt: null,
           createdAt: { gte: monthStart, lt: monthEnd },
-          ...leadScope,
         },
       }),
       prisma.lead.count({
@@ -188,7 +188,6 @@ router.get(
           tenantId,
           softDeletedAt: null,
           createdAt: { gte: dayStart, lt: dayEnd },
-          ...leadScope,
         },
       }),
       prisma.lead.count({ where: convertedWhere(dayStart, dayEnd) }),
@@ -324,12 +323,11 @@ router.get(
 
     const prospection30d: { day: string; imported: number; converted: number }[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
-      const d = new Date(year, month - 1, day);
-      const key = localDayKey(d);
+      const key = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const label = String(day).padStart(2, "0");
-      const imported = importedDaily.filter((l) => localDayKey(l.createdAt) === key).length;
+      const imported = importedDaily.filter((l) => zonedDayKey(l.createdAt) === key).length;
       const converted = convertedDaily.filter(
-        (l) => l.closedAt && localDayKey(l.closedAt) === key
+        (l) => l.closedAt && zonedDayKey(l.closedAt) === key
       ).length;
       if (day === 1 || day % 5 === 0 || day === daysInMonth) {
         prospection30d.push({ day: label, imported, converted });
@@ -347,7 +345,11 @@ router.get(
           year,
           month,
           isCurrentMonth,
-          label: monthStart.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+          label: monthStart.toLocaleDateString("pt-BR", {
+            month: "long",
+            year: "numeric",
+            timeZone: "America/Sao_Paulo",
+          }),
         },
         credits: {
           remaining: tenant.creditRemaining,

@@ -5,6 +5,7 @@ import { JobStatus, Prisma, Role, Temperature } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { enqueueScrapingJob, removeScrapingJob } from "../lib/queue";
 import { logger } from "../lib/logger";
+import { zonedTodayRange } from "../lib/timezone";
 import { asyncHandler } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
 import { releaseReservation, reserve } from "../services/credits";
@@ -53,8 +54,7 @@ router.get(
             .filter((t): t is Temperature => t != null)
         : [];
 
-    const dayStart = new Date();
-    dayStart.setHours(0, 0, 0, 0);
+    const { start: dayStart } = zonedTodayRange();
 
     const jobWhere: {
       tenantId: string;
@@ -353,7 +353,7 @@ router.post(
   asyncHandler(async (req: AuthedRequest, res) => {
     const body = z
       .object({
-        resultIds: z.array(z.string()).min(1),
+        resultIds: z.array(z.string()).min(1).max(500),
       })
       .parse(req.body);
 

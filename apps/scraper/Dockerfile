@@ -26,5 +26,9 @@ RUN pnpm --filter @orbixlead/shared build \
 
 WORKDIR /app/apps/scraper
 
+# INFRA-01: roda como usuário não-root. A imagem do Playwright já traz `pwuser`,
+# que é o modo recomendado para executar o Chromium.
+USER pwuser
+
 # concurrency=1 no código; um container = um worker
 CMD ["node", "dist/index.js"]

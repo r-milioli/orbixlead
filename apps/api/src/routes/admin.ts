@@ -8,6 +8,7 @@ import { asyncHandler, serializeUser } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole } from "../middleware/auth";
 import { grantPackage } from "../services/credits";
 import { createTenantWithDefaults } from "../services/tenants";
+import { passwordSchema } from "../lib/validators";
 
 const router = Router();
 
@@ -45,7 +46,7 @@ router.post(
         name: z.string().min(2),
         adminEmail: z.string().email(),
         adminName: z.string().min(2),
-        adminPassword: z.string().min(8),
+        adminPassword: passwordSchema,
         packageAmount: z.number().int().optional(),
         unlimited: z.boolean().optional(),
       })

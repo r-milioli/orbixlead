@@ -20,6 +20,16 @@ const tempFromScore: Record<string, Temperature> = {
 };
 
 async function main() {
+  // CONF-02: o seed é DESTRUTIVO (apaga e recria dados) e cria usuários com senhas
+  // conhecidas. Nunca deve rodar em produção por engano. Exige ALLOW_SEED=1 para tal.
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_SEED !== "1") {
+    console.error(
+      "[seed] ABORTADO: NODE_ENV=production. O seed apaga dados e cria contas de demo.\n" +
+        "Se realmente pretende semear em produção, defina ALLOW_SEED=1 explicitamente."
+    );
+    process.exit(1);
+  }
+
   const superEmail = (process.env.SEED_SUPER_ADMIN_EMAIL || "admin@orbixlead.local").toLowerCase();
   const superPassword = process.env.SEED_SUPER_ADMIN_PASSWORD || "Orbixlead@Admin123";
   const demoAdminEmail = (process.env.SEED_DEMO_ADMIN_EMAIL || "demo@orbixlead.local").toLowerCase();

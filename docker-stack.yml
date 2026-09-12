@@ -2,11 +2,18 @@
 # Rede: overlay externa network_public
 # Imagens: automacaodebaixocusto/orbixlead:{web,api,scraper}
 #
-# Preencha DATABASE_URL, REDIS_URL, SESSION_SECRET, INTERNAL_API_KEY e SMTP_*.
-# Super admin: preencha SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD na api,
-# ou deixe vazio e crie pela tela /setup no primeiro acesso.
-# Se o Postgres responde como serviço Docker `postgres` (veja o log do Prisma),
-# o Redis provavelmente é `redis://redis:6379` na mesma rede — não host.docker.internal.
+# SEGREDOS (CONF-01): NÃO coloque segredos em texto puro aqui. Use Docker Secrets.
+# A aplicação lê segredos via padrão *_FILE (ex.: SESSION_SECRET_FILE=/run/secrets/session_secret).
+#
+# Crie os segredos ANTES do deploy (exemplos):
+#   printf '%s' "$(openssl rand -hex 32)" | docker secret create orbixlead_session_secret -
+#   printf '%s' "$(openssl rand -hex 32)" | docker secret create orbixlead_internal_api_key -
+#   printf '%s' "postgresql://orbixlead:SENHA_FORTE@postgres:5432/orbixlead?schema=public" | docker secret create orbixlead_database_url -
+#   printf '%s' "SENHA_SMTP_BREVO"      | docker secret create orbixlead_smtp_pass -        # opcional
+#   printf '%s' "SENHA_SUPER_ADMIN"     | docker secret create orbixlead_super_admin_password - # opcional
+#
+# A API falha o boot (SEC-02) se SESSION_SECRET/INTERNAL_API_KEY estiverem ausentes,
+# curtos (<32/<16) ou usando placeholder. Redis permanece SEM senha (aceito: rede interna).
 # API e scraper DEVEM usar o mesmo REDIS_URL.
 #
 #   docker stack deploy -c docker-stack.yml orbixlead
@@ -59,22 +66,28 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: "4000"
-      DATABASE_URL: postgresql://orbixlead:ALTERE_A_SENHA@postgres:5432/orbixlead?schema=public
+      # Segredos via Docker Secrets (padrão *_FILE) — ver bloco `secrets:` no fim do arquivo.
+      DATABASE_URL_FILE: /run/secrets/orbixlead_database_url
+      SESSION_SECRET_FILE: /run/secrets/orbixlead_session_secret
+      INTERNAL_API_KEY_FILE: /run/secrets/orbixlead_internal_api_key
       REDIS_URL: redis://redis:6379
-      SESSION_SECRET: altere-para-um-segredo-aleatorio-com-no-minimo-32-chars
       WEB_ORIGIN: https://orbixlead.automacaodebaixocusto.com.br
       COOKIE_SECURE: "true"
-      INTERNAL_API_KEY: altere-esta-chave-interna
-      # Opcional: preencha os dois para criar o super admin na primeira subida.
-      # Se deixar vazio, o primeiro acesso abre https://.../setup
-      SUPER_ADMIN_EMAIL: ""
-      SUPER_ADMIN_PASSWORD: ""
+      # Opcional: crie o super admin na primeira subida via secret; senão use /setup.
+      # SUPER_ADMIN_EMAIL: admin@suaempresa.com
+      # SUPER_ADMIN_PASSWORD_FILE: /run/secrets/orbixlead_super_admin_password
       SUPER_ADMIN_NAME: Super Admin
       SMTP_HOST: smtp-relay.brevo.com
       SMTP_PORT: "587"
       SMTP_USER: ""
-      SMTP_PASS: ""
+      # SMTP_PASS_FILE: /run/secrets/orbixlead_smtp_pass
       SMTP_FROM: Orbixlead <noreply@automacaodebaixocusto.com.br>
+    secrets:
+      - orbixlead_database_url
+      - orbixlead_session_secret
+      - orbixlead_internal_api_key
+      # - orbixlead_smtp_pass
+      # - orbixlead_super_admin_password
     deploy:
       replicas: 1
       update_config:
@@ -112,12 +125,15 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://orbixlead:ALTERE_A_SENHA@postgres:5432/orbixlead?schema=public
+      DATABASE_URL_FILE: /run/secrets/orbixlead_database_url
       REDIS_URL: redis://redis:6379
       # Use o DNS interno do Swarm, não o domínio público (Traefik/sessão).
       API_URL: http://api:4000
       SCRAPER_MODE: playwright
-      INTERNAL_API_KEY: altere-esta-chave-interna
+      INTERNAL_API_KEY_FILE: /run/secrets/orbixlead_internal_api_key
+    secrets:
+      - orbixlead_database_url
+      - orbixlead_internal_api_key
     stop_grace_period: 60s
     deploy:
       replicas: 1
@@ -130,3 +146,16 @@ services:
 networks:
   network_public:
     external: true
+
+# CONF-01: segredos externos — crie com `docker secret create` antes do deploy (ver topo do arquivo).
+secrets:
+  orbixlead_database_url:
+    external: true
+  orbixlead_session_secret:
+    external: true
+  orbixlead_internal_api_key:
+    external: true
+  # orbixlead_smtp_pass:
+  #   external: true
+  # orbixlead_super_admin_password:
+  #   external: true

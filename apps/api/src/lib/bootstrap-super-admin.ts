@@ -71,7 +71,7 @@ export async function bootstrapSuperAdminFromEnv(): Promise<void> {
     return;
   }
 
-  if (password.length < 8) {
+  if (password.length < 10) {
     logger.warn("super_admin_bootstrap_skipped", { reason: "password_too_short" });
     return;
   }

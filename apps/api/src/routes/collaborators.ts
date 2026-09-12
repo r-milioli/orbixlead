@@ -6,6 +6,7 @@ import { prisma } from "../lib/prisma";
 import { sendMail, webUrl } from "../lib/mailer";
 import { asyncHandler, roleFromApi, serializeUser } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
+import { sensitiveAuthLimiter } from "../middleware/rate-limit";
 
 const router = Router();
 
@@ -62,6 +63,7 @@ router.get(
 
 router.post(
   "/invite",
+  sensitiveAuthLimiter,
   asyncHandler(async (req: AuthedRequest, res) => {
     const body = z
       .object({
@@ -136,6 +138,7 @@ router.patch(
 
 router.post(
   "/invites/:id/resend",
+  sensitiveAuthLimiter,
   asyncHandler(async (req: AuthedRequest, res) => {
     const existing = await findPendingInvite(req.user!.tenantId!, req.params.id);
     if (!existing) return res.status(404).json({ error: "Convite não encontrado" });

@@ -6,6 +6,8 @@ import { Role } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { asyncHandler, serializeUser } from "../lib/serialize";
 import { AuthedRequest, requireAuth, requireRole, requireTenant } from "../middleware/auth";
+import { destroyUserSessions } from "../lib/session-store";
+import { passwordSchema } from "../lib/validators";
 
 const router = Router();
 
@@ -118,7 +120,7 @@ router.post(
     const body = z
       .object({
         currentPassword: z.string().min(1),
-        newPassword: z.string().min(8),
+        newPassword: passwordSchema,
       })
       .parse(req.body);
 
@@ -140,6 +142,9 @@ router.post(
       where: { id: dbUser.id },
       data: { passwordHash },
     });
+
+    // SEC-08: invalida as demais sessões do usuário, preservando a sessão atual.
+    await destroyUserSessions(dbUser.id, req.sessionID);
 
     return res.json({ ok: true });
   })

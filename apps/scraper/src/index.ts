@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -18,6 +19,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Prefer monorepo root .env, then local overrides
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 dotenv.config();
+
+// CONF-01: suporte a Docker Secrets via padrão *_FILE.
+for (const name of ["INTERNAL_API_KEY", "REDIS_URL", "DATABASE_URL", "API_URL"]) {
+  const filePath = process.env[`${name}_FILE`];
+  if (!filePath || process.env[name]) continue;
+  try {
+    const value = fs.readFileSync(filePath, "utf8").trim();
+    if (value) process.env[name] = value;
+  } catch (err) {
+    console.error(`[secrets] Falha ao ler ${name}_FILE: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 const QUEUE_NAME = "scraping";
 const MODE = (process.env.SCRAPER_MODE ?? "mock").toLowerCase();

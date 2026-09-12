@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ActionIcon,
   Badge,
@@ -47,6 +48,20 @@ import { unwrapList, unwrapOne } from "@/lib/unwrap";
 import { colors, layout, ICON_SIZE, ICON_STROKE } from "@/theme/tokens";
 
 const PAGE_SIZE = 25;
+
+function dayKeyInSaoPaulo(date: Date | string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(typeof date === "string" ? new Date(date) : date);
+}
+
+function isCreatedTodayBRT(iso?: string | null) {
+  if (!iso) return false;
+  return dayKeyInSaoPaulo(iso) === dayKeyInSaoPaulo(new Date());
+}
 
 type CapturedLead = ScrapingResult & {
   segment?: string | null;
@@ -103,11 +118,19 @@ function closedReasonLabel(reason?: string | null) {
 }
 
 export default function LeadsPage() {
+  const searchParams = useSearchParams();
   const isMobile = useMediaQuery(`(max-width: ${layout.mobileBreakpoint}px)`, false, {
     getInitialValueInEffect: true,
   });
   const menuWidth = isMobile ? "calc(100vw - 16px)" : 210;
-  const [tab, setTab] = useState<string | null>("capturados");
+  const tabFromUrl = searchParams.get("tab");
+  const createdFromUrl = searchParams.get("created");
+  const initialTab =
+    tabFromUrl === "pipeline" || tabFromUrl === "encerrados" || tabFromUrl === "capturados"
+      ? tabFromUrl
+      : "capturados";
+  const [tab, setTab] = useState<string | null>(initialTab);
+  const onlyCreatedToday = createdFromUrl === "today";
 
   const [rows, setRows] = useState<CapturedLead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,10 +224,15 @@ export default function LeadsPage() {
     [rows]
   );
 
-  const crmTotalPages = Math.max(1, Math.ceil(crmLeads.length / PAGE_SIZE));
+  const crmLeadsVisible = useMemo(() => {
+    if (!onlyCreatedToday) return crmLeads;
+    return crmLeads.filter((l) => isCreatedTodayBRT(l.createdAt));
+  }, [crmLeads, onlyCreatedToday]);
+
+  const crmTotalPages = Math.max(1, Math.ceil(crmLeadsVisible.length / PAGE_SIZE));
   const crmCurrentPage = Math.min(crmPage, crmTotalPages);
   const crmPageStart = (crmCurrentPage - 1) * PAGE_SIZE;
-  const crmPageItems = crmLeads.slice(crmPageStart, crmPageStart + PAGE_SIZE);
+  const crmPageItems = crmLeadsVisible.slice(crmPageStart, crmPageStart + PAGE_SIZE);
 
   const toggleAllPage = (checked: boolean) => {
     const ids = pageItems

@@ -36,5 +36,7 @@ COPY --from=build /app/apps/api/prisma/migrations ./apps/api/prisma/migrations
 COPY --from=build /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
 WORKDIR /app/apps/api
 RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
+# INFRA-01: roda como usuário não-root (o usuário `node` já existe na imagem oficial).
+USER node
 EXPOSE 4000
 CMD ["./docker-entrypoint.sh"]

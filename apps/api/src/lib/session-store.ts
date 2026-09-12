@@ -1,6 +1,23 @@
 import session, { type SessionData } from "express-session";
 import { prisma } from "./prisma";
 
+/**
+ * SEC-08: invalida (apaga) todas as sessões de um usuário, opcionalmente
+ * preservando a sessão atual (`exceptSid`). Usado ao trocar/redefinir senha.
+ *
+ * As sessões são gravadas como JSON contendo `userId`; filtramos por `contains`.
+ * O `userId` é um identificador opaco (cuid), então o match é seguro.
+ */
+export async function destroyUserSessions(userId: string, exceptSid?: string): Promise<number> {
+  const result = await prisma.session.deleteMany({
+    where: {
+      data: { contains: `"userId":"${userId}"` },
+      ...(exceptSid ? { sid: { not: exceptSid } } : {}),
+    },
+  });
+  return result.count;
+}
+
 export class PrismaSessionStore extends session.Store {
   get(sid: string, callback: (err: unknown, session?: SessionData | null) => void): void {
     prisma.session
