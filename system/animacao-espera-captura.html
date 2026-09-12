@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbixlead — Animação de espera (captura)</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --primary: #15AABF;
+      --primary-hover: #1098AD;
+      --primary-dark: #0C8599;
+      --primary-light: #E3FAFC;
+      --bg: #F8F9FA;
+      --surface: #FFFFFF;
+      --surface-2: #F1F3F5;
+      --text: #212529;
+      --text-2: #495057;
+      --muted: #868E96;
+      --border: #DEE2E6;
+      --border-light: #E9ECEF;
+      --success: #2F9E44;
+      --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+      --radar: rgba(21, 170, 191, 0.18);
+      --radar-strong: rgba(21, 170, 191, 0.42);
+      --pin: #15AABF;
+      --map-line: rgba(33, 37, 41, 0.06);
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0D1117;
+      --surface: #151B23;
+      --surface-2: #1B222C;
+      --text: #F1F5F9;
+      --text-2: #CBD5E1;
+      --muted: #8B98A8;
+      --border: #303A46;
+      --border-light: #27313D;
+      --primary-light: #123D45;
+      --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.2);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.28);
+      --radar: rgba(21, 170, 191, 0.22);
+      --radar-strong: rgba(103, 232, 249, 0.35);
+      --pin: #67E8F9;
+      --map-line: rgba(241, 245, 249, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .meta h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+    }
+
+    .meta p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 52ch;
+      line-height: 1.5;
+    }
+
+    .note {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text-2);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .note strong { color: var(--text); }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-2);
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover { background: var(--surface-2); }
+    .btn.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .btn.primary:hover { background: var(--primary-hover); }
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(21, 170, 191, 0.35);
+    }
+
+    /* Preview card — simula o bloco "Status da captura" */
+    .preview-shell {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .preview-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .preview-head h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .preview-head .sub {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      white-space: nowrap;
+    }
+
+    [data-theme="dark"] .badge { color: #67E8F9; }
+
+    .wait-stage {
+      padding: 28px 18px 22px;
+      display: grid;
+      gap: 22px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    /* ——— Animação principal ——— */
+    .radar-wrap {
+      position: relative;
+      width: min(280px, 72vw);
+      height: min(280px, 72vw);
+      border-radius: 12px;
+      background:
+        linear-gradient(var(--map-line) 1px, transparent 1px) 0 0 / 28px 28px,
+        linear-gradient(90deg, var(--map-line) 1px, transparent 1px) 0 0 / 28px 28px,
+        var(--surface-2);
+      border: 1px solid var(--border-light);
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .radar-core {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    .radar-ring {
+      position: absolute;
+      width: 42%;
+      height: 42%;
+      border-radius: 50%;
+      border: 1px solid var(--radar-strong);
+      opacity: 0;
+      animation: pulse-ring 2.8s ease-out infinite;
+    }
+
+    .radar-ring:nth-child(2) { animation-delay: 0.9s; }
+    .radar-ring:nth-child(3) { animation-delay: 1.8s; }
+
+    .radar-sweep {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        transparent 280deg,
+        var(--radar) 320deg,
+        var(--radar-strong) 350deg,
+        transparent 360deg
+      );
+      animation: sweep 3.2s linear infinite;
+      opacity: 0.9;
+      mix-blend-mode: multiply;
+    }
+
+    [data-theme="dark"] .radar-sweep {
+      mix-blend-mode: screen;
+      opacity: 0.75;
+    }
+
+    .radar-center {
+      position: relative;
+      z-index: 2;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--primary);
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow-sm);
+      color: var(--primary-dark);
+    }
+
+    [data-theme="dark"] .radar-center { color: #67E8F9; }
+
+    .radar-center svg {
+      width: 22px;
+      height: 22px;
+      stroke-width: 1.8;
+    }
+
+    .pin {
+      position: absolute;
+      z-index: 3;
+      width: 10px;
+      height: 10px;
+      margin: -5px 0 0 -5px;
+      border-radius: 50%;
+      background: var(--pin);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--pin) 22%, transparent);
+      opacity: 0;
+      transform: scale(0.4);
+      animation: pin-pop 4.8s ease-in-out infinite;
+    }
+
+    .pin::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      width: 2px;
+      height: 8px;
+      margin-left: -1px;
+      background: color-mix(in srgb, var(--pin) 55%, transparent);
+      border-radius: 1px;
+    }
+
+    .pin:nth-child(1) { left: 22%; top: 28%; animation-delay: 0.2s; }
+    .pin:nth-child(2) { left: 68%; top: 24%; animation-delay: 1.1s; }
+    .pin:nth-child(3) { left: 48%; top: 58%; animation-delay: 1.9s; }
+    .pin:nth-child(4) { left: 78%; top: 62%; animation-delay: 2.7s; }
+    .pin:nth-child(5) { left: 30%; top: 72%; animation-delay: 3.4s; }
+
+    .status-copy {
+      max-width: 360px;
+    }
+
+    .status-copy .label {
+      margin: 0 0 6px;
+      font-size: 15px;
+      font-weight: 700;
+      min-height: 1.3em;
+    }
+
+    .status-copy .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .progress-track {
+      width: min(360px, 100%);
+      height: 6px;
+      background: var(--border-light);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 28%;
+      border-radius: 99px;
+      background: var(--primary);
+      animation: progress-slide 2.4s ease-in-out infinite;
+    }
+
+    .live-feed {
+      width: 100%;
+      max-width: 420px;
+      display: grid;
+      gap: 8px;
+      text-align: left;
+    }
+
+    .feed-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-light);
+      border-radius: 7px;
+      background: var(--surface);
+      opacity: 0;
+      transform: translateY(6px);
+      animation: feed-in 0.45s ease forwards;
+    }
+
+    .feed-item .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      flex: 0 0 auto;
+    }
+
+    .feed-item .name {
+      font-weight: 650;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .feed-item .meta-line {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .feed-empty {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 4px 0 0;
+    }
+
+    .variants {
+      margin-top: 28px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .variants h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .variant-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 760px) {
+      .variant-row { grid-template-columns: 1fr; }
+    }
+
+    .variant-card {
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 14px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .variant-card:hover { border-color: var(--border); box-shadow: var(--shadow-sm); }
+    .variant-card.active {
+      border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+      background: color-mix(in srgb, var(--primary-light) 55%, var(--surface));
+    }
+
+    .variant-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .variant-card span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    /* Variante compacta (inline no card de status) */
+    .compact-demo {
+      display: none;
+      width: 100%;
+      text-align: left;
+      padding: 4px 0 8px;
+    }
+
+    .compact-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .compact-spinner {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid var(--border-light);
+      border-top-color: var(--primary);
+      animation: spin 0.9s linear infinite;
+      flex: 0 0 auto;
+    }
+
+    .compact-text .label {
+      margin: 0 0 4px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .compact-text .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .dots::after {
+      content: "";
+      display: inline-block;
+      width: 1.2em;
+      text-align: left;
+      animation: dots 1.4s steps(4, end) infinite;
+    }
+
+    /* Variante minimal — só barra + texto */
+    .minimal-demo {
+      display: none;
+      width: 100%;
+      max-width: 420px;
+      text-align: left;
+      padding: 8px 0 4px;
+    }
+
+    .minimal-demo .label {
+      margin: 0 0 10px;
+      font-weight: 650;
+      font-size: 14px;
+      color: var(--text-2);
+    }
+
+    /* Estados de layout */
+    body[data-variant="radar"] .radar-wrap,
+    body[data-variant="radar"] .status-copy,
+    body[data-variant="radar"] .progress-track,
+    body[data-variant="radar"] .live-feed { display: grid; }
+
+    body[data-variant="radar"] .radar-wrap { display: block; }
+    body[data-variant="radar"] .progress-track { display: block; }
+
+    body[data-variant="compact"] .radar-wrap,
+    body[data-variant="compact"] .progress-track,
+    body[data-variant="compact"] .live-feed,
+    body[data-variant="compact"] .status-copy { display: none; }
+    body[data-variant="compact"] .compact-demo { display: block; }
+
+    body[data-variant="minimal"] .radar-wrap,
+    body[data-variant="minimal"] .live-feed,
+    body[data-variant="minimal"] .status-copy,
+    body[data-variant="minimal"] .compact-demo { display: none; }
+    body[data-variant="minimal"] .minimal-demo { display: block; }
+    body[data-variant="minimal"] .progress-track { display: block; width: 100%; max-width: none; }
+
+    @keyframes sweep {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.55); opacity: 0.55; }
+      70% { opacity: 0.12; }
+      100% { transform: scale(2.15); opacity: 0; }
+    }
+
+    @keyframes pin-pop {
+      0%, 8% { opacity: 0; transform: scale(0.4); }
+      14%, 55% { opacity: 1; transform: scale(1); }
+      70%, 100% { opacity: 0; transform: scale(0.6); }
+    }
+
+    @keyframes progress-slide {
+      0% { transform: translateX(-120%); width: 28%; }
+      50% { width: 42%; }
+      100% { transform: translateX(360%); width: 28%; }
+    }
+
+    @keyframes feed-in {
+      to { opacity: 1; transform: none; }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes dots {
+      0% { content: ""; }
+      25% { content: "."; }
+      50% { content: ".."; }
+      75% { content: "..."; }
+      100% { content: ""; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .radar-sweep,
+      .radar-ring,
+      .pin,
+      .progress-bar,
+      .compact-spinner,
+      .dots::after {
+        animation: none !important;
+      }
+      .radar-ring { opacity: 0.35; transform: scale(1.2); }
+      .pin { opacity: 1; transform: scale(1); }
+      .progress-bar { width: 45%; transform: none; }
+      .compact-spinner { border-top-color: var(--primary); opacity: 0.85; }
+    }
+  </style>
+</head>
+<body data-variant="radar">
+  <div class="page">
+    <div class="meta">
+      <div>
+        <h1>Animação de espera — captura de leads</h1>
+        <p>
+          Protótipo isolado para validação visual. Não está ligado ao app.
+          Abra este arquivo no navegador, escolha a variante e aprove antes de integrar na tela de captura.
+        </p>
+        <div class="note">
+          <strong>Contexto:</strong> enquanto o scraper busca no mapa, o usuário fica em
+          <em>queued</em> / <em>running</em>. A ideia é comunicar progresso e calma, sem parecer travado.
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn" type="button" id="themeBtn" aria-pressed="false">Tema escuro</button>
+        <button class="btn primary" type="button" id="restartBtn">Reiniciar demo</button>
+      </div>
+    </div>
+
+    <section class="preview-shell" aria-live="polite">
+      <div class="preview-head">
+        <div>
+          <h2>Status da captura</h2>
+          <p class="sub" id="jobMeta">Campinas · Clínicas odontológicas · 50 leads</p>
+        </div>
+        <span class="badge" id="statusBadge">Em andamento</span>
+      </div>
+
+      <div class="wait-stage">
+        <!-- Variante A: radar / mapa -->
+        <div class="radar-wrap" aria-hidden="true">
+          <div class="radar-sweep"></div>
+          <div class="radar-core">
+            <div class="radar-ring"></div>
+            <div class="radar-ring"></div>
+            <div class="radar-ring"></div>
+            <div class="radar-center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.5-3.5"></path>
+              </svg>
+            </div>
+          </div>
+          <span class="pin"></span>
+          <span class="pin"></span>
+          <span class="pin"></span>
+          <span class="pin"></span>
+          <span class="pin"></span>
+        </div>
+
+        <div class="status-copy">
+          <p class="label"><span id="statusLabel">Buscando no mapa</span><span class="dots" aria-hidden="true"></span></p>
+          <p class="hint" id="statusHint">
+            Estamos varrendo a região com cuidado para evitar bloqueios e trazer leads válidos.
+          </p>
+        </div>
+
+        <!-- Variante B: compacta -->
+        <div class="compact-demo">
+          <div class="compact-row">
+            <div class="compact-spinner" aria-hidden="true"></div>
+            <div class="compact-text">
+              <p class="label"><span id="statusLabelCompact">Processando sua busca</span><span class="dots"></span></p>
+              <p class="hint">Isso pode levar alguns minutos. Você pode acompanhar o status nesta tela.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Variante C: minimal -->
+        <div class="minimal-demo">
+          <p class="label"><span id="statusLabelMinimal">Processando sua busca</span><span class="dots"></span></p>
+        </div>
+
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso da captura">
+          <div class="progress-bar"></div>
+        </div>
+
+        <div class="live-feed" id="liveFeed" aria-label="Leads encontrados (simulação)"></div>
+      </div>
+    </section>
+
+    <div class="variants">
+      <h3>Escolha a variante</h3>
+      <div class="variant-row" role="listbox" aria-label="Variantes da animação">
+        <button class="variant-card active" type="button" data-variant="radar" role="option" aria-selected="true">
+          <strong>A — Radar no mapa</strong>
+          <span>Mais expressiva: varredura + pins surgindo + feed de empresas encontradas. Ideal se a espera for longa.</span>
+        </button>
+        <button class="variant-card" type="button" data-variant="compact" role="option" aria-selected="false">
+          <strong>B — Compacta</strong>
+          <span>Spinner + texto. Cabe no card atual de “Status da captura” sem ocupar muito espaço.</span>
+        </button>
+        <button class="variant-card" type="button" data-variant="minimal" role="option" aria-selected="false">
+          <strong>C — Minimal</strong>
+          <span>Só texto + barra indeterminada. Mais discreta, alinhada ao design system enxuto.</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const phases = [
+        {
+          label: "Buscando no mapa",
+          hint: "Estamos varrendo a região com cuidado para evitar bloqueios e trazer leads válidos."
+        },
+        {
+          label: "Analisando estabelecimentos",
+          hint: "Conferindo nomes, endereços e sinais de contato antes de registrar cada lead."
+        },
+        {
+          label: "Validando contatos",
+          hint: "Filtrando duplicados e números incompletos para não gastar crédito à toa."
+        },
+        {
+          label: "Organizando resultados",
+          hint: "Quase lá — montando a lista para você revisar e enviar ao CRM."
+        }
+      ];
+
+      const fakeCompanies = [
+        { name: "Clínica Sorriso Centro", meta: "Campinas · Rating 4.6" },
+        { name: "Odonto Vida", meta: "Campinas · Rating 4.8" },
+        { name: "Dental Prime", meta: "Barão Geraldo · Rating 4.3" },
+        { name: "Instituto Oral Care", meta: "Cambui · Rating 4.7" },
+        { name: "Espaço Dente Saudável", meta: "Taquaral · Rating 4.5" }
+      ];
+
+      const labelEl = document.getElementById("statusLabel");
+      const hintEl = document.getElementById("statusHint");
+      const labelCompact = document.getElementById("statusLabelCompact");
+      const labelMinimal = document.getElementById("statusLabelMinimal");
+      const feedEl = document.getElementById("liveFeed");
+      const themeBtn = document.getElementById("themeBtn");
+      const restartBtn = document.getElementById("restartBtn");
+      const variantCards = document.querySelectorAll(".variant-card");
+
+      let phaseIndex = 0;
+      let feedIndex = 0;
+      let phaseTimer;
+      let feedTimer;
+
+      function setLabels(text) {
+        labelEl.textContent = text;
+        labelCompact.textContent = text;
+        labelMinimal.textContent = text;
+      }
+
+      function applyPhase(i) {
+        const phase = phases[i % phases.length];
+        setLabels(phase.label);
+        hintEl.textContent = phase.hint;
+      }
+
+      function clearFeed() {
+        feedEl.innerHTML = "";
+        feedIndex = 0;
+        const empty = document.createElement("div");
+        empty.className = "feed-empty";
+        empty.id = "feedEmpty";
+        empty.textContent = "Leads encontrados aparecerão aqui (simulação).";
+        feedEl.appendChild(empty);
+      }
+
+      function pushFeedItem() {
+        if (feedIndex >= fakeCompanies.length) return;
+        const empty = document.getElementById("feedEmpty");
+        if (empty) empty.remove();
+
+        const item = fakeCompanies[feedIndex];
+        const row = document.createElement("div");
+        row.className = "feed-item";
+        row.innerHTML =
+          '<span class="dot" aria-hidden="true"></span>' +
+          "<div>" +
+          '<div class="name">' + item.name + "</div>" +
+          '<div class="meta-line">' + item.meta + "</div>" +
+          "</div>";
+        feedEl.appendChild(row);
+        feedIndex += 1;
+      }
+
+      function stopDemoTimers() {
+        clearInterval(phaseTimer);
+        clearInterval(feedTimer);
+      }
+
+      function startDemo() {
+        stopDemoTimers();
+        phaseIndex = 0;
+        applyPhase(0);
+        clearFeed();
+
+        phaseTimer = setInterval(function () {
+          phaseIndex += 1;
+          applyPhase(phaseIndex);
+        }, 4200);
+
+        feedTimer = setInterval(pushFeedItem, 2600);
+        setTimeout(pushFeedItem, 900);
+      }
+
+      themeBtn.addEventListener("click", function () {
+        const root = document.documentElement;
+        const dark = root.getAttribute("data-theme") === "dark";
+        root.setAttribute("data-theme", dark ? "light" : "dark");
+        themeBtn.textContent = dark ? "Tema escuro" : "Tema claro";
+        themeBtn.setAttribute("aria-pressed", dark ? "false" : "true");
+      });
+
+      restartBtn.addEventListener("click", startDemo);
+
+      variantCards.forEach(function (card) {
+        card.addEventListener("click", function () {
+          const variant = card.getAttribute("data-variant");
+          document.body.setAttribute("data-variant", variant);
+          variantCards.forEach(function (c) {
+            const on = c === card;
+            c.classList.toggle("active", on);
+            c.setAttribute("aria-selected", on ? "true" : "false");
+          });
+        });
+      });
+
+      startDemo();
+    })();
+  </script>
+</body>
+</html>

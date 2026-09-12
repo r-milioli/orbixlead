@@ -131,6 +131,9 @@ services:
       API_URL: http://api:4000
       SCRAPER_MODE: playwright
       INTERNAL_API_KEY_FILE: /run/secrets/orbixlead_internal_api_key
+      # Watchdog: se há jobs na fila e o worker fica mudo, exit(1) → restart.
+      SCRAPER_STUCK_IDLE_MS: "90000"
+      SCRAPER_WATCHDOG_MS: "30000"
     secrets:
       - orbixlead_database_url
       - orbixlead_internal_api_key
@@ -140,8 +143,18 @@ services:
       update_config:
         parallelism: 1
         delay: 10s
+      # on-failure: o watchdog mata o processo com exit 1 quando a fila trava.
       restart_policy:
         condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
+      resources:
+        limits:
+          # Playwright/Chromium: sem limite baixo demais (OOM freeze sem kill limpo).
+          memory: 2G
+        reservations:
+          memory: 512M
 
 networks:
   network_public:

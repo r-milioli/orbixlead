@@ -31,6 +31,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { TemperatureBadge } from "@/components/common/TemperatureBadge";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
+import { CaptureWaitingAnimation } from "@/components/captura/CaptureWaitingAnimation";
 import { useAuth } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import type { ScrapingJob, ScrapingResult } from "@/lib/types";
@@ -447,9 +448,7 @@ export default function CapturaPage() {
                 </Group>
               </Group>
               {(jobStatus === "queued" || jobStatus === "running") && (
-                <Text size="sm" c={colors.textSecondary}>
-                  Processando sua busca...
-                </Text>
+                <CaptureWaitingAnimation />
               )}
               {jobStatus === "completed" && (
                 <Text size="sm" c={colors.textSecondary}>

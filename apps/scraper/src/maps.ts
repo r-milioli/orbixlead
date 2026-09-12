@@ -38,8 +38,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
       reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`));
     }, ms);
   });
+  // Se o timeout vencer, a promise original continua e pode rejeitar depois
+  // (ex.: browser.close no finally). Sem este catch, vira unhandledRejection
+  // e pode degradar o event loop do worker BullMQ.
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) clearTimeout(timer);
+    void promise.catch(() => undefined);
   });
 }
 

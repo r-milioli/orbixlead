@@ -169,3 +169,206 @@ a {
 .mantine-Tabs-tab[data-active] {
   color: var(--orbix-primary);
 }
+
+/* Captura — animação de espera (variante radar) */
+.capture-wait-radar {
+  background-image:
+    linear-gradient(rgba(33, 37, 41, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(33, 37, 41, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+[data-mantine-color-scheme="dark"] .capture-wait-radar {
+  background-image:
+    linear-gradient(rgba(248, 249, 250, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(248, 249, 250, 0.06) 1px, transparent 1px);
+}
+
+.capture-wait-sweep {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 280deg,
+    rgba(21, 170, 191, 0.18) 320deg,
+    rgba(21, 170, 191, 0.42) 350deg,
+    transparent 360deg
+  );
+  animation: capture-wait-sweep 3.2s linear infinite;
+  opacity: 0.9;
+  mix-blend-mode: multiply;
+}
+
+[data-mantine-color-scheme="dark"] .capture-wait-sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 280deg,
+    rgba(21, 170, 191, 0.22) 320deg,
+    rgba(103, 232, 249, 0.35) 350deg,
+    transparent 360deg
+  );
+  mix-blend-mode: screen;
+  opacity: 0.75;
+}
+
+.capture-wait-ring {
+  position: absolute;
+  width: 42%;
+  height: 42%;
+  border-radius: 50%;
+  border: 1px solid rgba(21, 170, 191, 0.42);
+  opacity: 0;
+  animation: capture-wait-pulse 2.8s ease-out infinite;
+}
+
+[data-mantine-color-scheme="dark"] .capture-wait-ring {
+  border-color: rgba(103, 232, 249, 0.35);
+}
+
+.capture-wait-pin {
+  position: absolute;
+  z-index: 3;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--orbix-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orbix-primary) 22%, transparent);
+  opacity: 0;
+  transform: scale(0.4);
+  animation: capture-wait-pin 4.8s ease-in-out infinite;
+}
+
+[data-mantine-color-scheme="dark"] .capture-wait-pin {
+  background: #67e8f9;
+  box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.22);
+}
+
+.capture-wait-pin::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 2px;
+  height: 8px;
+  margin-left: -1px;
+  background: color-mix(in srgb, var(--orbix-primary) 55%, transparent);
+  border-radius: 1px;
+}
+
+[data-mantine-color-scheme="dark"] .capture-wait-pin::after {
+  background: rgba(103, 232, 249, 0.55);
+}
+
+.capture-wait-progress-bar {
+  height: 100%;
+  width: 28%;
+  border-radius: 99px;
+  background: var(--orbix-primary);
+  animation: capture-wait-progress 2.4s ease-in-out infinite;
+}
+
+.capture-wait-dots::after {
+  content: "";
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: capture-wait-dots 1.4s steps(4, end) infinite;
+}
+
+@keyframes capture-wait-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes capture-wait-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.55;
+  }
+  70% {
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(2.15);
+    opacity: 0;
+  }
+}
+
+@keyframes capture-wait-pin {
+  0%,
+  8% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  14%,
+  55% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes capture-wait-progress {
+  0% {
+    transform: translateX(-120%);
+    width: 28%;
+  }
+  50% {
+    width: 42%;
+  }
+  100% {
+    transform: translateX(360%);
+    width: 28%;
+  }
+}
+
+@keyframes capture-wait-dots {
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75% {
+    content: "...";
+  }
+  100% {
+    content: "";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capture-wait-sweep,
+  .capture-wait-ring,
+  .capture-wait-pin,
+  .capture-wait-progress-bar,
+  .capture-wait-dots::after {
+    animation: none !important;
+  }
+
+  .capture-wait-ring {
+    opacity: 0.35;
+    transform: scale(1.2);
+  }
+
+  .capture-wait-pin {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .capture-wait-progress-bar {
+    width: 45%;
+    transform: none;
+  }
+}
