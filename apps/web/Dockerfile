@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable && corepack prepare pnpm@11.22.0 --activate
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN pnpm --filter @orbixlead/shared build && pnpm --filter @orbixlead/web build
 # Falha o build se o layout standalone do monorepo não for gerado.
 RUN test -f apps/web/.next/standalone/apps/web/server.js
 
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
