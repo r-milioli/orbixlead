@@ -63,23 +63,30 @@ const tempFromScore: Record<string, Temperature> = {
 router.post(
   "/jobs/:id/start",
   asyncHandler(async (req, res) => {
-    const job = await prisma.scrapingJob.findUnique({ where: { id: req.params.id } });
-    if (!job) return res.status(404).json({ error: "Job não encontrado" });
+    const jobId = req.params.id;
+    logger.info("internal_start_received", { jobId });
+
+    const job = await prisma.scrapingJob.findUnique({ where: { id: jobId } });
+    if (!job) {
+      logger.error("internal_start_not_found", { jobId });
+      return res.status(404).json({ error: "Job não encontrado" });
+    }
     if (job.status === JobStatus.CANCELLED) {
       return res.status(409).json({ error: "cancelled", status: "cancelled" });
     }
-    if (
-      job.status === JobStatus.COMPLETED ||
-      job.status === JobStatus.FAILED
-    ) {
+    if (job.status === JobStatus.COMPLETED || job.status === JobStatus.FAILED) {
       return res.status(400).json({ error: "Job já finalizado" });
     }
 
     const logs = Array.isArray(job.logs) ? [...(job.logs as unknown[])] : [];
     logs.push({ at: new Date().toISOString(), message: "scraper.start" });
 
-    const updated = await prisma.scrapingJob.update({
-      where: { id: job.id },
+    // updateMany evita P2025 ruidoso se o registro sumir entre find e update.
+    const updatedCount = await prisma.scrapingJob.updateMany({
+      where: {
+        id: job.id,
+        status: { in: [JobStatus.QUEUED, JobStatus.RUNNING] },
+      },
       data: {
         status: JobStatus.RUNNING,
         startedAt: job.startedAt ?? new Date(),
@@ -88,12 +95,30 @@ router.post(
       },
     });
 
+    if (updatedCount.count === 0) {
+      const again = await prisma.scrapingJob.findUnique({ where: { id: job.id } });
+      logger.error("internal_start_update_miss", {
+        jobId: job.id,
+        previousStatus: job.status,
+        currentStatus: again?.status ?? null,
+        stillExists: Boolean(again),
+      });
+      if (!again) return res.status(404).json({ error: "Job não encontrado" });
+      if (again.status === JobStatus.CANCELLED) {
+        return res.status(409).json({ error: "cancelled", status: "cancelled" });
+      }
+      return res.status(409).json({
+        error: "Job não pôde ser iniciado",
+        status: again.status.toLowerCase(),
+      });
+    }
+
     return res.json({
-      id: updated.id,
-      city: updated.city,
-      segment: updated.segment,
-      quantity: updated.quantity,
-      country: updated.country,
+      id: job.id,
+      city: job.city,
+      segment: job.segment,
+      quantity: job.quantity,
+      country: job.country,
       status: "running",
     });
   })
@@ -355,8 +380,11 @@ router.post(
       });
     }
 
-    const updated = await prisma.scrapingJob.update({
-      where: { id: job.id },
+    const updatedCount = await prisma.scrapingJob.updateMany({
+      where: {
+        id: job.id,
+        status: { in: [JobStatus.QUEUED, JobStatus.RUNNING] },
+      },
       data: {
         status: isFinal ? JobStatus.FAILED : JobStatus.QUEUED,
         errorMessage: body.errorMessage,
@@ -366,12 +394,21 @@ router.post(
       },
     });
 
+    if (updatedCount.count === 0) {
+      logger.warn("internal_fail_update_miss", { jobId: job.id, isFinal });
+      return res.json({
+        ok: true,
+        ignored: true,
+        job: { id: job.id, status: job.status.toLowerCase(), errorMessage: body.errorMessage },
+      });
+    }
+
     return res.json({
       ok: true,
       job: {
-        id: updated.id,
-        status: updated.status.toLowerCase(),
-        errorMessage: updated.errorMessage,
+        id: job.id,
+        status: isFinal ? "failed" : "queued",
+        errorMessage: body.errorMessage,
       },
     });
   })

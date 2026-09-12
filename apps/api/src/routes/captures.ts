@@ -198,9 +198,23 @@ router.post(
       });
     }
 
+    // Garante leitura após commit antes de expor o job ao worker (evita race start→P2025).
+    const persisted = await prisma.scrapingJob.findUnique({ where: { id: job.id } });
+    if (!persisted) {
+      logger.error("scraping_job_missing_after_create", { jobId: job.id });
+      await releaseReservation({
+        tenantId: tenant.id,
+        amount: body.quantity,
+        jobId: job.id,
+        createdById: req.user!.id,
+        note: `Release — job sumiu após create ${job.id}`,
+      });
+      return res.status(500).json({ error: "Falha ao persistir captura. Tente novamente." });
+    }
+
     try {
       await enqueueScrapingJob({
-        jobId: job.id,
+        jobId: persisted.id,
         tenantId: tenant.id,
         country: body.country,
         city: body.city,
@@ -231,7 +245,7 @@ router.post(
       });
     }
 
-    return res.status(201).json({ job: serializeJob(job) });
+    return res.status(201).json({ job: serializeJob(persisted) });
   })
 );
 

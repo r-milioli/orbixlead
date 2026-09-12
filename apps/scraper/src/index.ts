@@ -109,7 +109,33 @@ async function processJob(job: Job<ScrapingJobData>): Promise<void> {
   pulse.unref?.();
 
   try {
-    const info = await notifyJobStart(jobId);
+    let info: Awaited<ReturnType<typeof notifyJobStart>>;
+    try {
+      info = await notifyJobStart(jobId);
+    } catch (startErr) {
+      // Fallback: payload BullMQ já traz city/segment/quantity (producer API).
+      const city = job.data?.city;
+      const segment = job.data?.segment;
+      const quantity = job.data?.quantity;
+      if (city && segment && typeof quantity === "number" && quantity > 0) {
+        log("warn", "job.start_fallback_payload", {
+          jobId,
+          message: startErr instanceof Error ? startErr.message : String(startErr),
+          city,
+          segment,
+          quantity,
+        });
+        info = {
+          id: jobId,
+          city,
+          segment,
+          quantity,
+          country: job.data.country ?? "BR",
+        };
+      } else {
+        throw startErr;
+      }
+    }
     started = true;
     log("info", "job.started", { jobId, city: info.city, segment: info.segment, quantity: info.quantity });
 
