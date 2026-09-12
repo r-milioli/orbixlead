@@ -1,6 +1,6 @@
 # Playwright já inclui Chromium e as dependências do sistema.
 # Manter a tag alinhada com a versão do playwright em package.json.
-FROM mcr.microsoft.com/playwright:v1.51.0-noble
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
