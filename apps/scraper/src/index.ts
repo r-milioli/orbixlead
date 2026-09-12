@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-import { Queue, Worker, type Job } from "bullmq";
+import { Queue, QueueEvents, Worker, type Job } from "bullmq";
 import {
   JobCancelledError,
   notifyJobComplete,
@@ -43,6 +43,8 @@ const WATCHDOG_MS = Number(process.env.SCRAPER_WATCHDOG_MS ?? 30_000);
 const LOCK_DURATION_MS = Number(process.env.SCRAPER_LOCK_DURATION_MS ?? 120_000);
 const LOCK_RENEW_MS = Number(process.env.SCRAPER_LOCK_RENEW_MS ?? 30_000);
 const STALLED_INTERVAL_MS = Number(process.env.SCRAPER_STALLED_INTERVAL_MS ?? 30_000);
+/** Heartbeat em idle: prova nos logs que o processo segue vivo sem job. */
+const IDLE_HEARTBEAT_MS = Number(process.env.SCRAPER_IDLE_HEARTBEAT_MS ?? 300_000);
 
 function log(level: "info" | "error" | "warn", msg: string, meta?: unknown) {
   const line = { ts: new Date().toISOString(), level, msg, ...(meta ? { meta } : {}) };
@@ -77,23 +79,34 @@ function redisConnectionOptions(redisUrl: string) {
   };
 }
 
-async function processJob(job: Job<ScrapingJobData>): Promise<void> {
-  const jobId = job.data?.jobId;
-  if (!jobId) {
-    throw new Error("Job payload missing jobId");
-  }
+/** Preenchido em main() — heartbeat durante scrape longo. */
+let onJobPulse: (() => void) | null = null;
 
+async function processJob(job: Job<ScrapingJobData>): Promise<void> {
+  // Log ANTES de validar — se faltar jobId, ainda aparece nos logs (Macaé: failed sem received).
   log("info", "job.received", {
     bullJobId: job.id,
-    jobId,
+    jobId: job.data?.jobId ?? null,
     attempt: job.attemptsMade + 1,
     mode: MODE,
+    dataKeys: job.data ? Object.keys(job.data) : [],
   });
+
+  const jobId = job.data?.jobId ?? (typeof job.id === "string" ? job.id : null);
+  if (!jobId) {
+    throw new Error(`Job payload missing jobId (bullJobId=${job.id})`);
+  }
 
   let started = false;
   const maxAttempts = job.opts.attempts ?? 1;
   const attempt = job.attemptsMade + 1;
   const isLastAttempt = attempt >= maxAttempts;
+
+  // Evita idleMs crescer durante Playwright (scrape pode passar de 3–12 min).
+  const pulse = setInterval(() => {
+    onJobPulse?.();
+  }, 20_000);
+  pulse.unref?.();
 
   try {
     const info = await notifyJobStart(jobId);
@@ -109,7 +122,10 @@ async function processJob(job: Job<ScrapingJobData>): Promise<void> {
 
     const results =
       MODE === "playwright"
-        ? await scrapeMaps(params, (level, msg, meta) => log(level, msg, { jobId, ...meta }))
+        ? await scrapeMaps(params, (level, msg, meta) => {
+            onJobPulse?.();
+            log(level, msg, { jobId, ...meta });
+          })
         : await scrapeMock(params);
 
     log("info", "job.scraped", { jobId, count: results.length, mode: MODE });
@@ -144,6 +160,8 @@ async function processJob(job: Job<ScrapingJobData>): Promise<void> {
 
     // Re-throw so BullMQ records the attempt / can retry per producer settings
     throw err;
+  } finally {
+    clearInterval(pulse);
   }
 }
 
@@ -177,16 +195,32 @@ function main() {
 
   // Fila só para inspeção (watchdog) — connection options são clonadas pelo BullMQ.
   const inspectQueue = new Queue(QUEUE_NAME, { connection });
+  const queueEvents = new QueueEvents(QUEUE_NAME, { connection });
 
   let lastActivityAt = Date.now();
+  let lastIdleHeartbeatAt = Date.now();
   let redisCloseAt: number | null = null;
   /** Desde quando há job em `waiting` sem `active` — NÃO usar idle desde o último job. */
   let waitingSince: number | null = null;
+  /** Delayed “vencido” sem promoção — possível blocking client morto. */
+  let overdueDelayedSince: number | null = null;
   const markActivity = () => {
     lastActivityAt = Date.now();
     redisCloseAt = null;
     waitingSince = null;
+    overdueDelayedSince = null;
   };
+  onJobPulse = markActivity;
+
+  queueEvents.on("failed", ({ jobId, failedReason }) => {
+    log("error", "queue.job_failed_event", { bullJobId: jobId, failedReason });
+  });
+  queueEvents.on("delayed", ({ jobId, delay }) => {
+    log("warn", "queue.job_delayed_event", { bullJobId: jobId, delay });
+  });
+  queueEvents.on("stalled", ({ jobId }) => {
+    log("warn", "queue.job_stalled_event", { bullJobId: jobId });
+  });
 
   worker.on("ready", () => {
     markActivity();
@@ -257,16 +291,10 @@ function main() {
   });
 
   /**
-   * Sintoma observado em prod:
-   * - Idle ~30–40min → TCP Redis morre; API ainda enfileira; worker não consome.
-   * - Container cai mid-job → job fica em `active`; novo container sobe mas só
-   *   reprocessa após stalled.
-   *
-   * BUG corrigido: NÃO usar idleMs desde o último job completo.
-   * Após 65min idle, um job novo chegava e o watchdog matava em ~2s
-   * (idleMs já era 3.9e6 ≥ 90s) — inclusive com job só em `delayed`.
-   * Agora: só mata se `waiting` permanecer > 0 sem `active` por STUCK_IDLE_MS contínuos.
-   * `delayed` não conta (backoff/agendamento — ainda não deve ser consumido).
+   * - waiting > 0 sem active por STUCK_IDLE_MS contínuos → exit (blocking client morto).
+   * - delayed NÃO conta (backoff).
+   * - NÃO matar por "active órfão" via idleMs: scrape Playwright >3min é normal;
+   *   BullMQ stalled + lock renew cuidam de crash mid-job.
    */
   const watchdog = setInterval(() => {
     void (async () => {
@@ -276,7 +304,6 @@ function main() {
           process.exit(1);
         }
 
-        // Redis close sem recuperação rápida → mata processo (Swarm sobe outro).
         if (redisCloseAt && Date.now() - redisCloseAt >= 60_000) {
           log("error", "worker.watchdog_redis_dead", {
             closedForMs: Date.now() - redisCloseAt,
@@ -315,18 +342,42 @@ function main() {
           waitingSince = null;
         }
 
-        // Active órfão sem progresso além do lock+stalled → reinicia.
-        if (
-          waiting === 0 &&
-          active > 0 &&
-          idleMs >= LOCK_DURATION_MS + STALLED_INTERVAL_MS * 2
-        ) {
-          log("error", "worker.watchdog_active_orphan", {
-            active,
-            idleMs,
-            counts,
+        // Delayed vencido (backoff já passou) sem virar waiting/active → investigar / reiniciar.
+        if (delayed > 0 && waiting === 0 && active === 0) {
+          const delayedJobs = await inspectQueue.getDelayed(0, 10);
+          const now = Date.now();
+          const overdue = delayedJobs.filter((j) => {
+            const when = (j.timestamp ?? 0) + (j.opts.delay ?? 0);
+            return when <= now;
           });
-          process.exit(1);
+          for (const j of overdue.slice(0, 3)) {
+            log("warn", "worker.delayed_job_detail", {
+              bullJobId: j.id,
+              jobId: j.data?.jobId ?? null,
+              attemptsMade: j.attemptsMade,
+              failedReason: j.failedReason ?? null,
+              delay: j.opts.delay ?? null,
+              timestamp: j.timestamp,
+              dataKeys: j.data ? Object.keys(j.data) : [],
+            });
+          }
+          if (overdue.length > 0) {
+            if (overdueDelayedSince == null) overdueDelayedSince = Date.now();
+            const overdueForMs = Date.now() - overdueDelayedSince;
+            if (overdueForMs >= STUCK_IDLE_MS) {
+              log("error", "worker.watchdog_delayed_stuck", {
+                delayed,
+                overdue: overdue.length,
+                overdueForMs,
+                counts,
+              });
+              process.exit(1);
+            }
+          } else {
+            overdueDelayedSince = null;
+          }
+        } else {
+          overdueDelayedSince = null;
         }
 
         if (waiting > 0 || delayed > 0 || active > 0) {
@@ -336,6 +387,13 @@ function main() {
             active,
             idleMs,
             waitingForMs: waitingSince != null ? Date.now() - waitingSince : 0,
+            counts,
+          });
+        } else if (Date.now() - lastIdleHeartbeatAt >= IDLE_HEARTBEAT_MS) {
+          lastIdleHeartbeatAt = Date.now();
+          log("info", "worker.idle_heartbeat", {
+            idleMs,
+            running: worker.isRunning(),
             counts,
           });
         }
@@ -357,6 +415,11 @@ function main() {
       log("warn", "worker.close_error", {
         message: err instanceof Error ? err.message : String(err),
       });
+    }
+    try {
+      await queueEvents.close();
+    } catch {
+      // ignore
     }
     try {
       await inspectQueue.close();

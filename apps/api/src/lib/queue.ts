@@ -24,6 +24,33 @@ export const scrapingQueue = new Queue<ScrapingJobPayload>(SCRAPING_QUEUE, {
   },
 });
 
+/**
+ * BullMQ: add() com jobId existente em failed/completed devolve o job antigo
+ * e NÃO reenfileira. Remove leftovers antes de criar.
+ */
+async function clearStaleJob(jobId: string): Promise<void> {
+  const existing = await scrapingQueue.getJob(jobId);
+  if (!existing) return;
+  const state = await existing.getState();
+  logger.warn("scraping_enqueue_stale_job", {
+    jobId,
+    state,
+    attemptsMade: existing.attemptsMade,
+    failedReason: existing.failedReason ?? null,
+  });
+  if (state === "completed" || state === "failed" || state === "delayed" || state === "waiting") {
+    try {
+      await existing.remove();
+    } catch {
+      try {
+        await existing.discard();
+      } catch {
+        // segue — add pode falhar e a API trata
+      }
+    }
+  }
+}
+
 export async function enqueueScrapingJob(payload: ScrapingJobPayload) {
   logger.info("scraping_enqueue_start", {
     jobId: payload.jobId,
@@ -31,6 +58,8 @@ export async function enqueueScrapingJob(payload: ScrapingJobPayload) {
     segment: payload.segment,
     quantity: payload.quantity,
   });
+
+  await clearStaleJob(payload.jobId);
 
   const added = await Promise.race([
     scrapingQueue.add("scrape", payload, { jobId: payload.jobId }),
@@ -41,11 +70,22 @@ export async function enqueueScrapingJob(payload: ScrapingJobPayload) {
     }),
   ]);
 
+  const state = await added.getState();
   logger.info("scraping_enqueued", {
     jobId: payload.jobId,
     bullJobId: added.id,
     queue: SCRAPING_QUEUE,
+    state,
+    attemptsMade: added.attemptsMade,
+    failedReason: added.failedReason ?? null,
   });
+
+  if (state === "failed" || state === "completed") {
+    throw new Error(
+      `Job ${payload.jobId} ficou em estado "${state}" após enqueue (possível colisão de jobId no Redis)`
+    );
+  }
+
   return added;
 }
 
