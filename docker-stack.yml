@@ -1,5 +1,6 @@
-# Stack Swarm de produção — sem Postgres, Redis ou Traefik (já existentes na VPS).
-# Rede: overlay externa network_public
+# Stack Swarm de produção — Postgres e Traefik externos; Redis dedicado nesta stack.
+# Rede pública: overlay externa network_public (Traefik, Postgres)
+# Rede interna: orbixlead_internal (só api/scraper ↔ redis do Orbixlead)
 # Imagens: automacaodebaixocusto/orbixlead:{web,api,scraper}
 #
 # SEGREDOS (CONF-01): NÃO coloque segredos em texto puro aqui. Use Docker Secrets.
@@ -13,14 +14,47 @@
 #   printf '%s' "SENHA_SUPER_ADMIN"     | docker secret create orbixlead_super_admin_password - # opcional
 #
 # A API falha o boot (SEC-02) se SESSION_SECRET/INTERNAL_API_KEY estiverem ausentes,
-# curtos (<32/<16) ou usando placeholder. Redis permanece SEM senha (aceito: rede interna).
-# API e scraper DEVEM usar o mesmo REDIS_URL.
+# curtos (<32/<16) ou usando placeholder.
+# API e scraper DEVEM usar o mesmo REDIS_URL (redis://redis:6379 = Redis desta stack).
 #
 #   docker stack deploy -c docker-stack.yml orbixlead
 
 version: "3.8"
 
 services:
+  redis:
+    image: redis:7-alpine
+    networks:
+      - orbixlead_internal
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--save",
+        "60",
+        "1000",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    volumes:
+      - orbixlead_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
   web:
     image: automacaodebaixocusto/orbixlead:web
     networks:
@@ -61,6 +95,7 @@ services:
     image: automacaodebaixocusto/orbixlead:api
     networks:
       - network_public
+      - orbixlead_internal
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -70,7 +105,9 @@ services:
       DATABASE_URL_FILE: /run/secrets/orbixlead_database_url
       SESSION_SECRET_FILE: /run/secrets/orbixlead_session_secret
       INTERNAL_API_KEY_FILE: /run/secrets/orbixlead_internal_api_key
+      # Redis dedicado desta stack (rede orbixlead_internal) — NÃO o redis compartilhado da VPS.
       REDIS_URL: redis://redis:6379
+      BULLMQ_PREFIX: orbixlead
       WEB_ORIGIN: https://orbixlead.automacaodebaixocusto.com.br
       COOKIE_SECURE: "true"
       # Opcional: crie o super admin na primeira subida via secret; senão use /setup.
@@ -121,12 +158,15 @@ services:
     image: automacaodebaixocusto/orbixlead:scraper
     networks:
       - network_public
+      - orbixlead_internal
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: production
       DATABASE_URL_FILE: /run/secrets/orbixlead_database_url
+      # Redis dedicado desta stack (mesmo host DNS "redis" na rede interna).
       REDIS_URL: redis://redis:6379
+      BULLMQ_PREFIX: orbixlead
       # Use o DNS interno do Swarm, não o domínio público (Traefik/sessão).
       API_URL: http://api:4000
       SCRAPER_MODE: playwright
@@ -137,12 +177,16 @@ services:
     secrets:
       - orbixlead_database_url
       - orbixlead_internal_api_key
-    stop_grace_period: 60s
+    # Evita 2 scrapers no mesmo Redis: Playwright pode ignorar SIGTERM até fechar o browser.
+    stop_grace_period: 30s
     deploy:
       replicas: 1
       update_config:
         parallelism: 1
         delay: 10s
+        # Padrão Swarm é start-first → container novo sobe ANTES do antigo cair = 2 workers.
+        order: stop-first
+        failure_action: rollback
       # on-failure: o watchdog mata o processo com exit 1 quando a fila trava.
       restart_policy:
         condition: on-failure
@@ -159,6 +203,13 @@ services:
 networks:
   network_public:
     external: true
+  # Só api/scraper/redis do Orbixlead — não compartilha com Wavro/multi-link/etc.
+  orbixlead_internal:
+    driver: overlay
+    attachable: false
+
+volumes:
+  orbixlead_redis_data:
 
 # CONF-01: segredos externos — crie com `docker secret create` antes do deploy (ver topo do arquivo).
 secrets:

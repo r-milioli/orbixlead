@@ -3,6 +3,8 @@ import { redis } from "./redis";
 import { logger } from "./logger";
 
 export const SCRAPING_QUEUE = "scraping";
+/** Prefixo obrigatório: Redis da VPS é compartilhado com outros stacks (fila "scraping" colide). */
+export const BULLMQ_PREFIX = process.env.BULLMQ_PREFIX || "orbixlead";
 const ENQUEUE_TIMEOUT_MS = 10_000;
 
 export type ScrapingJobPayload = {
@@ -16,6 +18,7 @@ export type ScrapingJobPayload = {
 
 export const scrapingQueue = new Queue<ScrapingJobPayload>(SCRAPING_QUEUE, {
   connection: redis.duplicate(),
+  prefix: BULLMQ_PREFIX,
   defaultJobOptions: {
     attempts: 2,
     backoff: { type: "fixed", delay: 5000 },
@@ -57,6 +60,8 @@ export async function enqueueScrapingJob(payload: ScrapingJobPayload) {
     city: payload.city,
     segment: payload.segment,
     quantity: payload.quantity,
+    prefix: BULLMQ_PREFIX,
+    queue: SCRAPING_QUEUE,
   });
 
   await clearStaleJob(payload.jobId);
@@ -75,6 +80,7 @@ export async function enqueueScrapingJob(payload: ScrapingJobPayload) {
     jobId: payload.jobId,
     bullJobId: added.id,
     queue: SCRAPING_QUEUE,
+    prefix: BULLMQ_PREFIX,
     state,
     attemptsMade: added.attemptsMade,
     failedReason: added.failedReason ?? null,

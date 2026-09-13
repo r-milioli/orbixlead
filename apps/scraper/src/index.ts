@@ -32,6 +32,8 @@ for (const name of ["INTERNAL_API_KEY", "REDIS_URL", "DATABASE_URL", "API_URL"])
 }
 
 const QUEUE_NAME = "scraping";
+/** Deve ser idêntico ao da API — Redis compartilhado na VPS. */
+const BULLMQ_PREFIX = process.env.BULLMQ_PREFIX || "orbixlead";
 const MODE = (process.env.SCRAPER_MODE ?? "mock").toLowerCase();
 /** Se há jobs waiting e o worker ficou ocioso além disso → exit(1) p/ Docker reiniciar. */
 const STUCK_IDLE_MS = Number(process.env.SCRAPER_STUCK_IDLE_MS ?? 90_000);
@@ -71,6 +73,7 @@ function redisConnectionOptions(redisUrl: string) {
     // keepAlive manda ACK antes do corte e evita blocking client zumbi.
     keepAlive: 10_000,
     noDelay: true,
+    connectionName: `orbixlead-scraper:${process.env.HOSTNAME ?? "unknown"}`,
     retryStrategy(times: number) {
       const delay = Math.min(times * 200, 5_000);
       log("warn", "redis.retry", { times, delayMs: delay });
@@ -212,16 +215,18 @@ function main() {
 
   const worker = new Worker<ScrapingJobData>(QUEUE_NAME, processJob, {
     connection,
+    prefix: BULLMQ_PREFIX,
     concurrency: 1,
     lockDuration: LOCK_DURATION_MS,
     lockRenewTime: LOCK_RENEW_MS,
     stalledInterval: STALLED_INTERVAL_MS,
     maxStalledCount: 2,
+    name: `scraper:${process.env.HOSTNAME ?? "unknown"}:${process.pid}`,
   });
 
   // Fila só para inspeção (watchdog) — connection options são clonadas pelo BullMQ.
-  const inspectQueue = new Queue(QUEUE_NAME, { connection });
-  const queueEvents = new QueueEvents(QUEUE_NAME, { connection });
+  const inspectQueue = new Queue(QUEUE_NAME, { connection, prefix: BULLMQ_PREFIX });
+  const queueEvents = new QueueEvents(QUEUE_NAME, { connection, prefix: BULLMQ_PREFIX });
 
   let lastActivityAt = Date.now();
   let lastIdleHeartbeatAt = Date.now();
@@ -252,11 +257,14 @@ function main() {
     markActivity();
     log("info", "worker.ready", {
       queue: QUEUE_NAME,
+      prefix: BULLMQ_PREFIX,
       mode: MODE,
       concurrency: 1,
       lockDurationMs: LOCK_DURATION_MS,
       lockRenewMs: LOCK_RENEW_MS,
       stalledIntervalMs: STALLED_INTERVAL_MS,
+      pid: process.pid,
+      hostname: process.env.HOSTNAME ?? null,
     });
     void (async () => {
       try {
@@ -275,6 +283,18 @@ function main() {
             hint: `Jobs em active sem worker anterior serão recolocados após ~${LOCK_DURATION_MS}ms (stalled)`,
           });
         }
+        // Se aparecer mais de 1 worker, outro container/processo está roubando a fila.
+        const peers = await inspectQueue.getWorkers();
+        log(peers.length > 1 ? "warn" : "info", "worker.peers", {
+          count: peers.length,
+          peers: peers.map((p) => ({
+            id: p.id,
+            name: p.name,
+            addr: p.addr,
+            age: p.age,
+            idle: p.idle,
+          })),
+        });
       } catch (err) {
         log("error", "worker.boot_snapshot_error", {
           message: err instanceof Error ? err.message : String(err),
