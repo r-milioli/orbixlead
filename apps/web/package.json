@@ -10,7 +10,7 @@
   "dependencies": {
     "@orbixlead/shared": "workspace:*",
     "@mantine/charts": "^7.17.3",
-    "@mantine/core": "^7.17.3",
+    "@mantine/core": "^9.6.0",
     "@mantine/dates": "^7.17.3",
     "@mantine/hooks": "^7.17.3",
     "@mantine/notifications": "^7.17.3",
