@@ -18,7 +18,7 @@
     "@orbixlead/shared": "workspace:*",
     "@prisma/client": "^6.5.0",
     "bcrypt": "^5.1.1",
-    "bullmq": "^5.44.0",
+    "bullmq": "^6.3.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
