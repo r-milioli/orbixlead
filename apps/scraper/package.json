@@ -14,7 +14,7 @@
     "bullmq": "^5.44.0",
     "dotenv": "^16.4.7",
     "ioredis": "^5.6.0",
-    "playwright": "1.51.0"
+    "playwright": "1.63.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
